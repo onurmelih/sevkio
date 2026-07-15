@@ -1,0 +1,12 @@
+{
+  "name": "Kargo Tarama",
+  "short_name": "KargoTara",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12151C",
+  "theme_color": "#12151C",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

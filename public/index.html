@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kargo Tarama</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#12151C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#12151C; --surface:#1B212B; --surface-2:#232B38;
+    --accent:#F5A623; --accent-dim:#8a611c;
+    --success:#2FBF71; --danger:#E5484D;
+    --text:#F4F6F8; --muted:#8A93A3; --border:#2B3341;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  .stripe{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 3px,transparent 3px 6px,var(--accent-dim) 6px 8px,transparent 8px 12px);}
+  header{padding:18px 20px 10px;}
+  h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:28px;letter-spacing:0.5px;margin:0;text-transform:uppercase;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px;}
+  main{padding:0 16px 24px;max-width:480px;margin:0 auto;}
+
+  /* Login */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:16px;}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px;}
+  input{width:100%;padding:13px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:16px;}
+  input:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+  button{width:100%;padding:15px;border:none;border-radius:10px;font-size:16px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;margin-top:16px;}
+  .btn-primary{background:var(--accent);color:#1a1300;}
+  .btn-primary:active{transform:scale(0.98);}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border);}
+  .error-msg{color:var(--danger);font-size:14px;margin-top:10px;}
+
+  /* Scanner */
+  #reader{width:100%;border-radius:14px;overflow:hidden;border:2px solid var(--accent);margin-top:16px;}
+  .scan-hint{text-align:center;color:var(--muted);font-size:13px;margin-top:10px;}
+  .manual-toggle{text-align:center;margin-top:14px;font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline;}
+
+  /* Result */
+  .result-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-top:16px;}
+  .badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 9px;border-radius:6px;background:var(--surface-2);color:var(--accent);letter-spacing:0.5px;text-transform:uppercase;}
+  .cust{font-size:19px;font-weight:600;margin:12px 0 2px;}
+  .addr{color:var(--muted);font-size:14px;}
+  .divider{height:1px;background:var(--border);margin:16px 0;}
+  .item-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+  .item-row:last-child{border-bottom:none;}
+  .item-name{font-size:14px;}
+  .item-sku{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);}
+  .item-qty{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--accent);font-size:15px;}
+  .status-ok{background:rgba(47,191,113,0.12);border:1px solid var(--success);color:var(--success);padding:14px;border-radius:10px;text-align:center;font-weight:600;margin-top:16px;}
+  .status-err{background:rgba(229,72,77,0.12);border:1px solid var(--danger);color:var(--danger);padding:14px;border-radius:10px;text-align:center;font-weight:600;margin-top:16px;}
+  .hidden{display:none;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;}
+  .logout{font-size:12px;color:var(--muted);cursor:pointer;}
+</style>
+</head>
+<body>
+  <div class="stripe"></div>
+  <header>
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">depo operasyon</div>
+        <h1>Kargo Tarama</h1>
+      </div>
+      <div id="logoutBtn" class="logout hidden">Çıkış yap</div>
+    </div>
+  </header>
+
+  <main>
+    <!-- LOGIN -->
+    <section id="loginView" class="card">
+      <label>E-posta</label>
+      <input id="email" type="email" value="depo@demo.com" autocomplete="username">
+      <label>Şifre</label>
+      <input id="password" type="password" value="123456" autocomplete="current-password">
+      <button class="btn-primary" onclick="login()">Giriş yap</button>
+      <div id="loginError" class="error-msg hidden"></div>
+    </section>
+
+    <!-- SCANNER -->
+    <section id="scanView" class="hidden">
+      <div id="reader"></div>
+      <div class="scan-hint">Barkodu kamera çerçevesine getir</div>
+      <div class="manual-toggle" onclick="toggleManual()">veya barkodu elle gir</div>
+      <div id="manualBox" class="card hidden">
+        <label>Kargo barkod numarası</label>
+        <input id="manualBarcode" type="text" inputmode="numeric" placeholder="12884512...">
+        <button class="btn-primary" onclick="lookupManual()">Sorgula</button>
+      </div>
+    </section>
+
+    <!-- RESULT -->
+    <section id="resultView" class="hidden">
+      <div class="result-card">
+        <span class="badge" id="mpBadge"></span>
+        <div class="cust" id="custName"></div>
+        <div class="addr" id="custAddr"></div>
+        <div class="divider"></div>
+        <div id="itemList"></div>
+      </div>
+      <button class="btn-primary" id="shipBtn" onclick="shipOrder()">Kargoya Ver ve Stok Düş</button>
+      <button class="btn-ghost" onclick="resetScan()">Yeni barkod tara</button>
+      <div id="shipResult"></div>
+    </section>
+  </main>
+
+<script>
+let token = null;
+let currentOrderId = null;
+let scanner = null;
+
+function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  fetch('/api/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email, password})
+  }).then(r => r.json()).then(data => {
+    if(data.error){
+      const el = document.getElementById('loginError');
+      el.textContent = data.error; el.classList.remove('hidden');
+      return;
+    }
+    token = data.token;
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('scanView').classList.remove('hidden');
+    document.getElementById('logoutBtn').classList.remove('hidden');
+    startScanner();
+  });
+}
+
+document.getElementById('logoutBtn').onclick = () => location.reload();
+
+function startScanner(){
+  scanner = new Html5Qrcode("reader");
+  scanner.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 260, height: 140 } },
+    (decodedText) => { scanner.pause(); lookupBarcode(decodedText); },
+    () => {}
+  ).catch(err => {
+    document.getElementById('reader').innerHTML =
+      '<div style="padding:20px;color:var(--muted);text-align:center;font-size:13px;">Kameraya erişilemedi. Tarayıcı izinlerini kontrol et veya barkodu elle gir.</div>';
+  });
+}
+
+function toggleManual(){ document.getElementById('manualBox').classList.toggle('hidden'); }
+function lookupManual(){ lookupBarcode(document.getElementById('manualBarcode').value.trim()); }
+
+function lookupBarcode(barcode){
+  fetch('/api/scan/' + encodeURIComponent(barcode), { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(data => {
+      if(data.error){ alert(data.error); if(scanner) scanner.resume(); return; }
+      showResult(data);
+    });
+}
+
+function showResult(data){
+  document.getElementById('scanView').classList.add('hidden');
+  document.getElementById('resultView').classList.remove('hidden');
+  currentOrderId = data.order.id;
+  document.getElementById('mpBadge').textContent = data.order.marketplace + ' · ' + data.order.marketplace_order_no;
+  document.getElementById('custName').textContent = data.order.customer_name || '—';
+  document.getElementById('custAddr').textContent = data.order.customer_address || '';
+  const list = document.getElementById('itemList');
+  list.innerHTML = '';
+  data.items.forEach(it => {
+    list.innerHTML += `<div class="item-row">
+      <div><div class="item-name">${it.name}</div><div class="item-sku">${it.sku} · stok: ${it.stock}</div></div>
+      <div class="item-qty">×${it.quantity}</div>
+    </div>`;
+  });
+  document.getElementById('shipResult').innerHTML = '';
+  document.getElementById('shipBtn').classList.remove('hidden');
+  document.getElementById('shipBtn').disabled = false;
+  document.getElementById('shipBtn').textContent = 'Kargoya Ver ve Stok Düş';
+}
+
+function shipOrder(){
+  document.getElementById('shipBtn').disabled = true;
+  document.getElementById('shipBtn').textContent = 'İşleniyor...';
+  fetch('/api/orders/' + currentOrderId + '/ship', {
+    method:'POST', headers:{ Authorization: 'Bearer ' + token }
+  }).then(r => r.json()).then(data => {
+    const box = document.getElementById('shipResult');
+    if(data.error){
+      box.innerHTML = `<div class="status-err">${data.error}</div>`;
+      document.getElementById('shipBtn').disabled = false;
+      document.getElementById('shipBtn').textContent = 'Kargoya Ver ve Stok Düş';
+      return;
+    }
+    box.innerHTML = `<div class="status-ok">Kargoya verildi. Stok ${data.marketplacesUpdated} pazaryerinde güncellendi.</div>`;
+    document.getElementById('shipBtn').classList.add('hidden');
+  });
+}
+
+function resetScan(){
+  document.getElementById('resultView').classList.add('hidden');
+  document.getElementById('scanView').classList.remove('hidden');
+  document.getElementById('manualBarcode').value = '';
+  if(scanner){ scanner.resume(); } else { startScanner(); }
+}
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>

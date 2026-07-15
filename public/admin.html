@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yönetici Paneli — Kargo Tarama</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12151C; --surface:#1B212B; --surface-2:#232B38;
+    --accent:#F5A623; --accent-dim:#8a611c;
+    --success:#2FBF71; --danger:#E5484D; --muted-badge:#4A5568;
+    --text:#F4F6F8; --muted:#8A93A3; --border:#2B3341;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  .stripe{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 3px,transparent 3px 6px,var(--accent-dim) 6px 8px,transparent 8px 12px);}
+  header{padding:18px 20px 10px;max-width:720px;margin:0 auto;}
+  h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:26px;letter-spacing:0.5px;margin:0;text-transform:uppercase;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px;}
+  main{padding:0 16px 40px;max-width:720px;margin:0 auto;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:16px;}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px;}
+  input,select{width:100%;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;}
+  input:focus,select:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+  button{padding:12px 18px;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
+  .btn-primary{background:var(--accent);color:#1a1300;}
+  .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn-sm{padding:8px 14px;font-size:13px;}
+  .hidden{display:none;}
+  .mp-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);}
+  .mp-row:last-child{border-bottom:none;}
+  .mp-name{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;text-transform:uppercase;}
+  .badge{font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 9px;border-radius:6px;letter-spacing:0.5px;text-transform:uppercase;}
+  .badge-active{background:rgba(47,191,113,0.15);color:var(--success);}
+  .badge-inactive{background:rgba(229,72,77,0.12);color:var(--danger);}
+  .badge-none{background:var(--surface-2);color:var(--muted);}
+  .badge-soon{background:var(--surface-2);color:var(--muted);}
+  .row-actions{display:flex;gap:8px;align-items:center;}
+  .toggle{width:44px;height:24px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);position:relative;cursor:pointer;}
+  .toggle.on{background:var(--success);}
+  .toggle-dot{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;}
+  .toggle.on .toggle-dot{left:22px;}
+  .form-box{margin-top:10px;padding-top:14px;border-top:1px dashed var(--border);}
+  .msg{margin-top:10px;font-size:13px;padding:10px 12px;border-radius:8px;}
+  .msg-ok{background:rgba(47,191,113,0.12);color:var(--success);}
+  .msg-err{background:rgba(229,72,77,0.12);color:var(--danger);}
+  .error-msg{color:var(--danger);font-size:14px;margin-top:10px;}
+</style>
+</head>
+<body>
+  <div class="stripe"></div>
+  <header>
+    <div class="eyebrow">yönetici paneli</div>
+    <h1>Pazaryeri Bağlantıları</h1>
+  </header>
+
+  <main>
+    <section id="loginView" class="card">
+      <label>E-posta</label>
+      <input id="email" type="email" value="depo@demo.com">
+      <label>Şifre</label>
+      <input id="password" type="password" value="123456">
+      <button class="btn-primary" style="width:100%;margin-top:16px;" onclick="login()">Giriş yap</button>
+      <div id="loginError" class="error-msg hidden"></div>
+    </section>
+
+    <section id="panelView" class="hidden">
+      <div class="card" id="mpList"></div>
+    </section>
+  </main>
+
+<script>
+const MARKETPLACES = [
+  { id: 'trendyol', name: 'Trendyol', syncable: true },
+  { id: 'n11', name: 'N11', syncable: true },
+  { id: 'hepsiburada', name: 'Hepsiburada', syncable: false },
+  { id: 'ciceksepeti', name: 'ÇiçekSepeti', syncable: false },
+  { id: 'amazon', name: 'Amazon', syncable: false },
+];
+
+let token = null;
+let connections = {};
+
+function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  fetch('/api/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email, password})
+  }).then(r => r.json()).then(data => {
+    if(data.error){
+      const el = document.getElementById('loginError');
+      el.textContent = data.error; el.classList.remove('hidden');
+      return;
+    }
+    token = data.token;
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('panelView').classList.remove('hidden');
+    loadConnections();
+  });
+}
+
+function loadConnections(){
+  fetch('/api/marketplace-connections', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      connections = {};
+      list.forEach(c => connections[c.marketplace] = c);
+      render();
+    });
+}
+
+function render(){
+  const box = document.getElementById('mpList');
+  box.innerHTML = '';
+  MARKETPLACES.forEach(mp => {
+    const conn = connections[mp.id];
+    const row = document.createElement('div');
+    row.className = 'mp-row';
+    row.innerHTML = `
+      <div>
+        <div class="mp-name">${mp.name}</div>
+        <div style="margin-top:4px;">
+          ${!mp.syncable ? '<span class="badge badge-soon">yakında</span>' :
+            conn ? `<span class="badge ${conn.is_active ? 'badge-active' : 'badge-inactive'}">${conn.is_active ? 'aktif' : 'kapalı'}</span> <span style="color:var(--muted);font-size:12px;">satıcı: ${conn.seller_id}</span>`
+            : '<span class="badge badge-none">bağlı değil</span>'}
+        </div>
+      </div>
+      <div class="row-actions">
+        ${mp.syncable && conn ? `<div class="toggle ${conn.is_active ? 'on' : ''}" onclick="toggleConn('${mp.id}')"><div class="toggle-dot"></div></div>` : ''}
+        ${mp.syncable ? `<button class="btn-ghost btn-sm" onclick="toggleForm('${mp.id}')">${conn ? 'Düzenle' : 'Bağla'}</button>` : ''}
+        ${mp.syncable && conn && conn.is_active ? `<button class="btn-primary btn-sm" onclick="syncNow('${mp.id}')">Siparişleri Çek</button>` : ''}
+      </div>
+    `;
+    box.appendChild(row);
+
+    const formBox = document.createElement('div');
+    formBox.id = 'form-' + mp.id;
+    formBox.className = 'form-box hidden';
+    formBox.innerHTML = `
+      <label>Satıcı ID (sellerId)</label>
+      <input id="sellerId-${mp.id}" value="${conn ? conn.seller_id : ''}">
+      <label>API Key</label>
+      <input id="apiKey-${mp.id}" placeholder="değiştirmek istemiyorsan boş bırak">
+      <label>API Secret</label>
+      <input id="apiSecret-${mp.id}" placeholder="değiştirmek istemiyorsan boş bırak">
+      <label>Ortam</label>
+      <select id="environment-${mp.id}">
+        <option value="prod" ${conn && conn.environment==='prod' ? 'selected':''}>Canlı (prod)</option>
+        <option value="stage" ${conn && conn.environment==='stage' ? 'selected':''}>Test (stage)</option>
+      </select>
+      <button class="btn-primary btn-sm" style="margin-top:14px;" onclick="saveConn('${mp.id}')">Kaydet</button>
+      <div id="msg-${mp.id}"></div>
+    `;
+    box.appendChild(formBox);
+  });
+}
+
+function toggleForm(marketplace){
+  document.getElementById('form-' + marketplace).classList.toggle('hidden');
+}
+
+function saveConn(marketplace){
+  const sellerId = document.getElementById('sellerId-' + marketplace).value;
+  const apiKey = document.getElementById('apiKey-' + marketplace).value;
+  const apiSecret = document.getElementById('apiSecret-' + marketplace).value;
+  const environment = document.getElementById('environment-' + marketplace).value;
+  fetch('/api/marketplace-connections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ marketplace, sellerId, apiKey, apiSecret, environment })
+  }).then(r => r.json()).then(data => {
+    const msg = document.getElementById('msg-' + marketplace);
+    if(data.error){ msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">Kaydedildi.</div>`;
+    loadConnections();
+  });
+}
+
+function toggleConn(marketplace){
+  fetch('/api/marketplace-connections/' + marketplace + '/toggle', {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + token }
+  }).then(r => r.json()).then(() => loadConnections());
+}
+
+function syncNow(marketplace){
+  fetch('/api/sync/' + marketplace, {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token }
+  }).then(r => r.json()).then(data => {
+    if(data.error){ alert(data.error); return; }
+    alert(`${marketplace}: ${data.created} yeni sipariş, ${data.updated} güncellendi.`);
+  });
+}
+</script>
+</body>
+</html>
