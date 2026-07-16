@@ -13,7 +13,11 @@ async function main() {
 
   await query(
     `INSERT INTO users (company_id, name, email, password_hash, role) VALUES ($1,$2,$3,$4,$5)`,
-    [companyId, 'Demo Yönetici', 'depo@demo.com', bcrypt.hashSync('123456', 8), 'yonetici']
+    [companyId, 'Demo Yönetici', 'yonetici@demo.com', bcrypt.hashSync('123', 8), 'yonetici']
+  );
+  await query(
+    `INSERT INTO users (company_id, name, email, password_hash, role) VALUES ($1,$2,$3,$4,$5)`,
+    [companyId, 'Demo Çalışan', 'calisan@demo.com', bcrypt.hashSync('123', 8), 'depo']
   );
 
   const products = [
@@ -62,7 +66,8 @@ async function main() {
   }
 
   console.log('Seed tamam. company_id =', companyId);
-  console.log('Giriş: depo@demo.com / 123456');
+  console.log('Yönetici girişi: yonetici@demo.com / 123');
+  console.log('Çalışan girişi: calisan@demo.com / 123');
   console.log('Denemek için örnek barkodlar:', demoOrders.map(o => o.barcode).join(', '));
   await pool.end();
 }
