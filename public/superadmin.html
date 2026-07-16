@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Süper Admin — Sevkio</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1F17; --surface:#122B21; --surface-2:#17362A;
+    --accent:#BEF264; --accent-dim:#5c7a1f;
+    --success:#34D399; --danger:#E5484D;
+    --text:#F5FBF7; --muted:#8FA99C; --border:#1E3B2E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  .stripe{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 3px,transparent 3px 6px,var(--accent-dim) 6px 8px,transparent 8px 12px);}
+  header{padding:20px 24px 12px;max-width:960px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;}
+  h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:26px;letter-spacing:0.5px;margin:0;text-transform:uppercase;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px;}
+  main{padding:0 20px 40px;max-width:960px;margin:0 auto;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px;margin-top:18px;}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px;}
+  input,select{width:100%;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;}
+  input:focus,select:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+  button{padding:12px 18px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+  .btn-primary{background:var(--accent);color:#0F2417;}
+  .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn-sm{padding:8px 14px;font-size:13px;}
+  .hidden{display:none;}
+  .error-msg{color:var(--danger);font-size:14px;margin-top:10px;}
+  .msg{margin-top:10px;font-size:13px;padding:10px 12px;border-radius:8px;}
+  .msg-ok{background:rgba(52,211,153,0.12);color:var(--success);}
+  .msg-err{background:rgba(229,72,77,0.12);color:var(--danger);}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{text-align:left;color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;padding:10px 8px;border-bottom:1px solid var(--border);}
+  td{padding:12px 8px;border-bottom:1px solid var(--border);}
+  tr:last-child td{border-bottom:none;}
+  .badge{font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 9px;border-radius:6px;text-transform:uppercase;}
+  .badge-deneme{background:var(--surface-2);color:var(--muted);}
+  .badge-aktif{background:rgba(52,211,153,0.15);color:var(--success);}
+  .badge-dondurulmus{background:rgba(229,72,77,0.12);color:var(--danger);}
+  .section-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;text-transform:uppercase;margin:32px 0 4px;}
+  .tag{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);}
+  select.status-select{width:auto;padding:6px 10px;font-size:12px;}
+</style>
+</head>
+<body>
+  <div class="stripe"></div>
+  <header>
+    <div>
+      <div class="eyebrow">süper admin</div>
+      <img src="/logo-dark.png" alt="Sevkio" height="22" style="display:block;margin-bottom:6px;">
+      <h1 style="font-size:20px;">Kontrol Merkezi</h1>
+    </div>
+    <div id="logoutBtn" class="hidden" style="cursor:pointer;color:var(--muted);font-size:13px;">Çıkış yap</div>
+  </header>
+
+  <main>
+    <section id="loginView" class="card" style="max-width:420px;">
+      <label>E-posta</label>
+      <input id="email" type="email">
+      <label>Şifre</label>
+      <input id="password" type="password">
+      <button class="btn-primary" style="width:100%;margin-top:16px;" onclick="login()">Giriş yap</button>
+      <div id="loginError" class="error-msg hidden"></div>
+    </section>
+
+    <section id="panelView" class="hidden">
+      <div class="card">
+        <div class="section-title" style="margin-top:0;">Yeni Firma Ekle</div>
+        <label>Firma adı</label>
+        <input id="new-company-name" placeholder="Örnek: Acme Tekstil">
+        <label>Yönetici adı</label>
+        <input id="new-admin-name" placeholder="Yöneticinin adı soyadı">
+        <label>Yönetici e-posta</label>
+        <input id="new-admin-email" type="email" placeholder="yonetici@firma.com">
+        <label>Yönetici şifre</label>
+        <input id="new-admin-password" placeholder="Geçici şifre belirle">
+        <button class="btn-primary btn-sm" style="margin-top:16px;" onclick="createCompany()">Firma Oluştur</button>
+        <div id="create-msg"></div>
+      </div>
+
+      <div class="section-title">Firmalar</div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Firma</th><th>Durum</th><th>Kullanıcı</th><th>Sipariş</th><th></th></tr></thead>
+          <tbody id="companyRows"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Gelen Talepler (Pazarlama Sitesi)</div>
+      <div class="card">
+        <table>
+          <thead><tr><th>İsim</th><th>Firma</th><th>İletişim</th><th>Mesaj</th><th>Durum</th></tr></thead>
+          <tbody id="leadRows"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Kullanıcı Şifresi Sıfırla</div>
+      <div class="card">
+        <div style="color:var(--muted);font-size:13px;margin-bottom:10px;">
+          Bir firma yöneticisi şifresini unutup kilitlenirse (çalışanı yoksa/sıfırlayacak kimse kalmadıysa) buradan sıfırlayabilirsin.
+        </div>
+        <label>Kullanıcının e-postası</label>
+        <input id="reset-email" type="email" placeholder="yonetici@firma.com">
+        <label>Yeni şifre</label>
+        <input id="reset-password" placeholder="En az 6 karakter">
+        <button class="btn-primary btn-sm" style="margin-top:14px;" onclick="resetUserPassword()">Şifreyi Sıfırla</button>
+        <div id="reset-msg"></div>
+      </div>
+    </section>
+  </main>
+
+<script>
+let token = null;
+
+function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  fetch('/api/superadmin/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password })
+  }).then(r => r.json()).then(data => {
+    if (data.error) {
+      const el = document.getElementById('loginError');
+      el.textContent = data.error; el.classList.remove('hidden');
+      return;
+    }
+    token = data.token;
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('panelView').classList.remove('hidden');
+    document.getElementById('logoutBtn').classList.remove('hidden');
+    loadCompanies();
+    loadLeads();
+  });
+}
+document.getElementById('logoutBtn').onclick = () => location.reload();
+
+function createCompany(){
+  const companyName = document.getElementById('new-company-name').value;
+  const adminName = document.getElementById('new-admin-name').value;
+  const adminEmail = document.getElementById('new-admin-email').value;
+  const adminPassword = document.getElementById('new-admin-password').value;
+  fetch('/api/superadmin/companies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ companyName, adminName, adminEmail, adminPassword })
+  }).then(r => r.json()).then(data => {
+    const msg = document.getElementById('create-msg');
+    if (data.error) { msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">"${data.company.name}" oluşturuldu. Giriş bilgilerini firmaya ilet: ${adminEmail} / (belirlediğin şifre)</div>`;
+    document.getElementById('new-company-name').value = '';
+    document.getElementById('new-admin-name').value = '';
+    document.getElementById('new-admin-email').value = '';
+    document.getElementById('new-admin-password').value = '';
+    loadCompanies();
+  });
+}
+
+function loadCompanies(){
+  fetch('/api/superadmin/companies', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      document.getElementById('companyRows').innerHTML = list.map(c => `
+        <tr>
+          <td>${c.name}</td>
+          <td><span class="badge badge-${c.plan_status}">${c.plan_status}</span></td>
+          <td>${c.user_count}</td>
+          <td>${c.order_count}</td>
+          <td>
+            <select class="status-select" onchange="updateStatus(${c.id}, this.value)">
+              <option value="deneme" ${c.plan_status==='deneme'?'selected':''}>deneme</option>
+              <option value="aktif" ${c.plan_status==='aktif'?'selected':''}>aktif</option>
+              <option value="dondurulmus" ${c.plan_status==='dondurulmus'?'selected':''}>dondurulmuş</option>
+            </select>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="tag">Henüz firma yok.</td></tr>';
+    });
+}
+
+function updateStatus(id, status){
+  fetch('/api/superadmin/companies/' + id + '/status', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ status })
+  }).then(() => loadCompanies());
+}
+
+function loadLeads(){
+  fetch('/api/superadmin/leads', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      document.getElementById('leadRows').innerHTML = list.map(l => `
+        <tr>
+          <td>${l.name}</td>
+          <td>${l.company_name || '—'}</td>
+          <td class="tag">${[l.email, l.phone].filter(Boolean).join(' · ') || '—'}</td>
+          <td style="max-width:220px;">${l.message || '—'}</td>
+          <td>
+            <select class="status-select" onchange="updateLeadStatus(${l.id}, this.value)">
+              <option value="yeni" ${l.status==='yeni'?'selected':''}>yeni</option>
+              <option value="iletisimde" ${l.status==='iletisimde'?'selected':''}>iletişimde</option>
+              <option value="donusturuldu" ${l.status==='donusturuldu'?'selected':''}>dönüştürüldü</option>
+              <option value="ilgilenmiyor" ${l.status==='ilgilenmiyor'?'selected':''}>ilgilenmiyor</option>
+            </select>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" class="tag">Henüz talep yok.</td></tr>';
+    });
+}
+
+function updateLeadStatus(id, status){
+  fetch('/api/superadmin/leads/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ status })
+  }).then(() => loadLeads());
+}
+
+function resetUserPassword(){
+  const email = document.getElementById('reset-email').value;
+  const newPassword = document.getElementById('reset-password').value;
+  const msg = document.getElementById('reset-msg');
+  fetch('/api/superadmin/users/reset-password', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ email, newPassword })
+  }).then(r => r.json()).then(data => {
+    if (data.error) { msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">${data.user.name} için şifre sıfırlandı.</div>`;
+    document.getElementById('reset-email').value = '';
+    document.getElementById('reset-password').value = '';
+  });
+}
+</script>
+</body>
+</html>

@@ -13,7 +13,7 @@ async function main() {
 
   await query(
     `INSERT INTO users (company_id, name, email, password_hash, role) VALUES ($1,$2,$3,$4,$5)`,
-    [companyId, 'Depo Çalışanı', 'depo@demo.com', bcrypt.hashSync('123456', 8), 'depo']
+    [companyId, 'Demo Yönetici', 'depo@demo.com', bcrypt.hashSync('123456', 8), 'yonetici']
   );
 
   const products = [

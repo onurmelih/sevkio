@@ -2,5 +2,8 @@
   "version": 2,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" }
+  ],
+  "crons": [
+    { "path": "/api/cron/sync-all", "schedule": "0 */6 * * *" }
   ]
 }

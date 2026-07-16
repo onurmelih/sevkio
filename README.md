@@ -8,6 +8,54 @@ Bu sürüm artık **kimsenin bilgisayarında değil**, bulutta çalışacak şek
 Mantık aynı: pazaryeri API'leri hâlâ **mock (sahte)** — gerçek anahtarların gelince
 `api/index.js` içindeki `pushStockToMarketplaces` fonksiyonu gerçek isteklere dönüşecek.
 
+## İki Ayrı Site, İki Ayrı Vercel Projesi
+
+Pazarlama sitesi artık bu projede DEĞİL — ayrı bir "Sevkio Pazarlama Sitesi" paketinde
+(`sevkio-marketing-site.zip`), tamamen ayrı bir Vercel projesi olarak deploy ediliyor.
+
+- **Bu proje** (`sevkio` reposu) → `app.html`, `panel.html`, `superadmin.html`, tüm API
+  → hedef alan adı: `sevkio.online` (satın alınca bağlanacak, şimdilik `sevkio.vercel.app`)
+- **Ayrı proje** (`sevkio-marketing` reposu, ayrı zip'te) → sadece tanıtım sayfası
+  → hedef alan adı: `sevkio.com` (satın alınca bağlanacak)
+
+Bu projede kök adrese (`/`) gelen istek otomatik olarak `/app.html`'e yönlendirilir — çünkü
+pazarlama sitesi artık burada değil, kök adresin bir işi kalmadı.
+
+Pazarlama sitesini deploy etme adımları, indirdiğin `sevkio-marketing-site.zip` içindeki
+kendi README'sinde var.
+
+## Sistemin 4 Katmanı
+
+Artık sistem 4 ayrı alandan oluşuyor, her biri farklı bir kişi için:
+
+| Adres | Kim kullanır | Ne yapar |
+|---|---|---|
+| `/` | Herkes (halka açık) | Pazarlama sitesi — ürünü tanıtır, "Demo iste" formuyla talep toplar |
+| `/superadmin.html` | Sadece sen (platform sahibi) | Yeni firma/müşteri ekler, firmaları dondurur/aktif eder, gelen talepleri görür |
+| `/panel.html` | Firma yöneticisi (müşterin) | Pazaryeri bağlantıları + kendi çalışanlarını ekler/siler |
+| `/app.html` | Depo çalışanı | Barkod okutur, kargoya verir (PWA, telefona eklenebilir) |
+
+**Firma izolasyonu (çok önemli):** Her kullanıcının giriş yaptığında aldığı kimlik kartı (JWT token)
+içine hangi firmaya ait olduğu damgalanır. Sunucudaki her sorgu bu damgayı kontrol eder — A
+firmasının bir çalışanı, token'ını değiştirse bile B firmasının verisini asla göremez, çünkü
+sorgu zaten "sadece benim firma numaramla eşleşenleri getir" diye çalışıyor. Bunu test ettim:
+iki farklı firma oluşturup birbirlerinin ürün/sipariş verisine erişilemediğini doğruladım.
+
+**Rol bazlı yetki:** `depo` rolündeki bir çalışan barkod okutup kargoya verebilir ama pazaryeri
+bağlantılarını göremez/değiştiremez, yeni çalışan ekleyemez — bunlar sadece `yonetici` rolüne açık.
+
+## Süper Admin hesabını ilk kez oluşturma
+
+Vercel'de **Environment Variables** kısmına şunları ekle:
+- `SUPERADMIN_EMAIL` → kendi e-postan
+- `SUPERADMIN_PASSWORD` → güçlü bir şifre
+
+Deploy ettiğinde (ya da yeniden deploy ettiğinde) sunucu ilk açılışında bu bilgilerle otomatik
+bir süper admin hesabı oluşturur. Sonra `/superadmin.html` adresinden bu bilgilerle giriş yapıp
+yeni müşteri firmalar ekleyebilirsin — her firma için bir isim + yönetici e-posta/şifre girip
+"Firma Oluştur" diyorsun, o bilgileri müşteriye iletiyorsun, müşteri `/panel.html`'den giriş yapıp
+kendi pazaryeri bağlantılarını ve çalışanlarını ekliyor.
+
 ## Vercel + GitHub + Supabase ile yükleme — adım adım
 
 ### 1) Bu kodu GitHub'a koy
@@ -109,6 +157,28 @@ vercel.json    -> Vercel yönlendirme ayarı
 
 Veritabanı tasarımı çoklu firma (multi-tenant) — her satırda `company_id` var,
 yani birden fazla müşteri firma aynı sistemi kullanabilir, verileri hiç karışmaz.
+
+## Otomatik Sipariş Çekme (Vercel Cron)
+
+Artık "Siparişleri Çek" butonuna basmak zorunda değilsin — sistem 6 saatte bir otomatik
+kontrol ediyor. Bunun çalışması için Vercel'de bir ortam değişkeni daha eklemen gerekiyor:
+
+- `CRON_SECRET` → rastgele, uzun bir metin (örnek: `openssl rand -hex 32` çıktısı)
+
+Bunu eklemezsen cron endpoint'i çalışmaz (güvenlik için kasıtlı olarak reddeder).
+Vercel, bu değişkeni otomatik olarak cron isteklerine ekliyor, sen sadece değeri girmen yeterli.
+
+**Not:** Vercel'in ücretsiz (Hobby) planında cron sıklığı konusunda kısıtlamalar olabilir
+(plan detayları değişebiliyor) — eğer 6 saatte bir çalışmıyorsa Vercel hesabındaki
+"Cron Jobs" sekmesinden veya güncel fiyatlandırma sayfasından kontrol et.
+
+## Şifremi Unuttum
+
+Henüz e-posta gönderme altyapısı olmadığı için "şifremi unuttum, linke tıkla" akışı yok.
+Onun yerine:
+- Bir çalışan şifresini unutursa → firma yöneticisi `/panel.html` → Çalışanlar → "Şifre Sıfırla"
+- Firma yöneticisi şifresini unutursa (ve sıfırlayacak başka yönetici yoksa) → sen (süper admin)
+  `/superadmin.html` → "Kullanıcı Şifresi Sıfırla" bölümünden e-postasını girip sıfırlarsın
 
 ## Yönetici Paneli
 

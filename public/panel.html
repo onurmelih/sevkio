@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Yönetici Paneli — Sevkio</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1F17; --surface:#122B21; --surface-2:#17362A;
+    --accent:#BEF264; --accent-dim:#5c7a1f;
+    --success:#34D399; --danger:#E5484D; --muted-badge:#4A5568;
+    --text:#F5FBF7; --muted:#8FA99C; --border:#1E3B2E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  .stripe{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 3px,transparent 3px 6px,var(--accent-dim) 6px 8px,transparent 8px 12px);}
+  header{padding:18px 20px 10px;max-width:720px;margin:0 auto;}
+  h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:26px;letter-spacing:0.5px;margin:0;text-transform:uppercase;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px;}
+  main{padding:0 16px 40px;max-width:720px;margin:0 auto;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:16px;}
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px;}
+  input,select{width:100%;padding:12px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;}
+  input:focus,select:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+  button{padding:12px 18px;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Inter',sans-serif;cursor:pointer;}
+  .btn-primary{background:var(--accent);color:#0F2417;}
+  .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn-sm{padding:8px 14px;font-size:13px;}
+  .hidden{display:none;}
+  .mp-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);}
+  .mp-row:last-child{border-bottom:none;}
+  .mp-name{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:700;text-transform:uppercase;}
+  .badge{font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 9px;border-radius:6px;letter-spacing:0.5px;text-transform:uppercase;}
+  .badge-active{background:rgba(52,211,153,0.15);color:var(--success);}
+  .badge-inactive{background:rgba(229,72,77,0.12);color:var(--danger);}
+  .badge-none{background:var(--surface-2);color:var(--muted);}
+  .badge-soon{background:var(--surface-2);color:var(--muted);}
+  .row-actions{display:flex;gap:8px;align-items:center;}
+  .toggle{width:44px;height:24px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);position:relative;cursor:pointer;}
+  .toggle.on{background:var(--success);}
+  .toggle-dot{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s;}
+  .toggle.on .toggle-dot{left:22px;}
+  .form-box{margin-top:10px;padding-top:14px;border-top:1px dashed var(--border);}
+  .msg{margin-top:10px;font-size:13px;padding:10px 12px;border-radius:8px;}
+  .msg-ok{background:rgba(52,211,153,0.12);color:var(--success);}
+  .msg-err{background:rgba(229,72,77,0.12);color:var(--danger);}
+  .error-msg{color:var(--danger);font-size:14px;margin-top:10px;}
+  .tabs{display:flex;gap:8px;max-width:720px;margin:16px auto 0;padding:0 16px;}
+  .tab{padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;color:var(--muted);}
+  .tab.active{background:var(--surface);color:var(--accent);}
+  .emp-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
+  .emp-row:last-child{border-bottom:none;}
+  .role-badge{font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:6px;background:var(--surface-2);color:var(--muted);text-transform:uppercase;}
+  .role-badge.yonetici{color:var(--accent);}
+  table.prod-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.prod-table th{text-align:left;color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;padding:8px 6px;border-bottom:1px solid var(--border);}
+  table.prod-table td{padding:10px 6px;border-bottom:1px solid var(--border);vertical-align:top;}
+  table.prod-table tr.low-stock td{background:rgba(229,72,77,0.08);}
+  .stock-num{font-family:'JetBrains Mono',monospace;font-weight:700;}
+  .stock-num.low{color:var(--danger);}
+  .prod-search{margin-bottom:12px;}
+  #reader-product{width:100%;max-width:320px;border-radius:10px;overflow:hidden;margin-top:10px;}
+  .inline-check{display:flex;align-items:center;gap:8px;margin-top:12px;}
+  .inline-check input[type=checkbox]{width:auto;}
+  .subtle-btn{background:none;border:none;color:var(--accent);font-size:12px;padding:4px 0;cursor:pointer;text-decoration:underline;}
+  textarea.csv-box{width:100%;min-height:100px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:12px;font-family:'JetBrains Mono',monospace;font-size:12px;}
+  #toastBox{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:999;display:flex;flex-direction:column;gap:8px;width:calc(100% - 32px);max-width:420px;}
+  .toast{background:var(--surface);border:1px solid var(--accent);border-left:4px solid var(--accent);border-radius:10px;padding:14px 16px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,0.35);animation:toast-in .25s ease;}
+  @keyframes toast-in{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}
+  .toast b{color:var(--accent);}
+  .ret-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);gap:10px;}
+  .ret-row:last-child{border-bottom:none;}
+  .ret-status{font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:6px;text-transform:uppercase;}
+  .ret-status.bekliyor{background:rgba(190,242,100,0.15);color:var(--accent);}
+  .ret-status.onaylandi{background:rgba(52,211,153,0.15);color:var(--success);}
+  .ret-status.reddedildi{background:rgba(229,72,77,0.12);color:var(--danger);}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <div class="stripe"></div>
+  <header style="display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div class="eyebrow">yönetici paneli</div>
+      <img src="/logo-dark.png" alt="Sevkio" height="24" style="display:block;">
+    </div>
+    <div id="headerActions" class="hidden" style="display:flex;align-items:center;gap:14px;">
+      <span id="soundToggle" style="cursor:pointer;font-size:18px;" onclick="toggleSound()">🔔</span>
+      <span style="cursor:pointer;color:var(--muted);font-size:13px;" onclick="location.reload()">Çıkış yap</span>
+    </div>
+  </header>
+  <div id="toastBox"></div>
+
+  <main>
+    <section id="loginView" class="card">
+      <label>E-posta</label>
+      <input id="email" type="email" value="depo@demo.com">
+      <label>Şifre</label>
+      <input id="password" type="password" value="123456">
+      <button class="btn-primary" style="width:100%;margin-top:16px;" onclick="login()">Giriş yap</button>
+      <div id="loginError" class="error-msg hidden"></div>
+    </section>
+
+    <section id="panelView" class="hidden">
+      <div class="tabs">
+        <div class="tab active" id="tab-mp" onclick="showTab('mp')">Pazaryerleri</div>
+        <div class="tab" id="tab-emp" onclick="showTab('emp')">Çalışanlar</div>
+        <div class="tab" id="tab-prod" onclick="showTab('prod')">Ürünler</div>
+        <div class="tab" id="tab-ret" onclick="showTab('ret')">İadeler</div>
+        <div class="tab" id="tab-ord" onclick="showTab('ord')">Siparişler</div>
+      </div>
+      <div class="card" id="mpList"></div>
+
+      <div class="card hidden" id="empView">
+        <div id="empList"></div>
+        <div class="form-box">
+          <label>Ad Soyad</label>
+          <input id="emp-name">
+          <label>E-posta</label>
+          <input id="emp-email" type="email">
+          <label>Şifre</label>
+          <input id="emp-password" type="password">
+          <label>Rol</label>
+          <select id="emp-role">
+            <option value="depo">Depo çalışanı (sadece barkod tarama)</option>
+            <option value="yonetici">Yönetici (pazaryeri + çalışan yönetimi de yapabilir)</option>
+          </select>
+          <button class="btn-primary btn-sm" style="margin-top:14px;" onclick="addEmployee()">Çalışan Ekle</button>
+          <div id="emp-msg"></div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="prodView">
+        <input class="prod-search" id="prod-search" placeholder="Ürün adı ya da SKU ara..." oninput="renderProducts()">
+        <table class="prod-table">
+          <thead><tr><th>Ürün</th><th>Kategori</th><th>Stok</th><th>Fiyat</th><th>KDV</th><th></th></tr></thead>
+          <tbody id="prodRows"></tbody>
+        </table>
+
+        <div class="form-box">
+          <div style="font-weight:600;margin-bottom:6px;" id="prod-form-title">Yeni Ürün Ekle</div>
+          <label>SKU</label>
+          <input id="p-sku">
+          <label>Ürün adı</label>
+          <input id="p-name">
+          <label>Barkod</label>
+          <div style="display:flex;gap:8px;">
+            <input id="p-barcode" style="flex:1;">
+          </div>
+          <div class="subtle-btn" onclick="toggleProdScanner()">📷 Barkodu kamerayla oku</div>
+          <div id="reader-product" class="hidden"></div>
+          <label>Stok</label>
+          <input id="p-stock" type="number" value="0">
+          <label>Kategori</label>
+          <input id="p-category" placeholder="Örn: Giyim > Erkek > Tişört">
+          <label>Varyant (opsiyonel — örn: Beden: M, Renk: Kırmızı)</label>
+          <input id="p-variant" placeholder="M - Kırmızı">
+          <label>Fiyat (₺)</label>
+          <input id="p-price" type="number" step="0.01">
+          <label>KDV oranı</label>
+          <select id="p-vat">
+            <option value="1">%1</option>
+            <option value="10">%10</option>
+            <option value="20" selected>%20</option>
+          </select>
+          <div class="inline-check">
+            <input type="checkbox" id="p-low-enabled">
+            <label style="margin:0;">Düşük stok uyarısı aktif olsun</label>
+          </div>
+          <label>Uyarı eşiği (stok bu sayının altına inince uyar)</label>
+          <input id="p-low-threshold" type="number" placeholder="Örn: 5">
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <button class="btn-primary btn-sm" onclick="saveProduct()">Kaydet</button>
+            <button class="btn-ghost btn-sm hidden" id="p-cancel-edit" onclick="cancelEditProduct()">Vazgeç</button>
+          </div>
+          <div id="prod-msg"></div>
+        </div>
+
+        <div class="form-box">
+          <div style="font-weight:600;margin-bottom:6px;">Excel/CSV ile Toplu Ekle</div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:8px;">
+            İlk satır başlık olmalı: <span style="font-family:'JetBrains Mono',monospace;">sku,name,barcode,stock,category,price,vatRate</span>
+          </div>
+          <textarea class="csv-box" id="csv-input" placeholder="sku,name,barcode,stock,category,price,vatRate&#10;TS-001,Tişört Siyah L,8690001000019,42,Giyim,199.90,20"></textarea>
+          <button class="btn-primary btn-sm" style="margin-top:10px;" onclick="importCsv()">İçe Aktar</button>
+          <div id="csv-msg"></div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="retView">
+        <div style="color:var(--muted);font-size:13px;margin-bottom:12px;">
+          Depo çalışanları uygulama üzerinden iade bildirir, buradan onaylayınca stok geri eklenir.
+        </div>
+        <div id="retRows"></div>
+      </div>
+
+      <div class="card hidden" id="ordView">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <select id="ord-filter-status" onchange="loadOrders()" style="width:auto;">
+            <option value="">Tüm durumlar</option>
+            <option value="yeni">Yeni</option>
+            <option value="kargoda">Kargoda</option>
+            <option value="teslim">Teslim</option>
+            <option value="iptal">İptal</option>
+          </select>
+          <select id="ord-filter-mp" onchange="loadOrders()" style="width:auto;">
+            <option value="">Tüm pazaryerleri</option>
+            <option value="trendyol">Trendyol</option>
+            <option value="n11">N11</option>
+            <option value="hepsiburada">Hepsiburada</option>
+            <option value="amazon">Amazon</option>
+            <option value="ciceksepeti">ÇiçekSepeti</option>
+          </select>
+          <button class="btn-ghost btn-sm" onclick="loadOrders()">Yenile</button>
+        </div>
+        <table class="prod-table">
+          <thead><tr><th>Sipariş</th><th>Müşteri</th><th>Ürün Adedi</th><th>Durum</th><th>Tarih</th><th></th></tr></thead>
+          <tbody id="ordRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+<script>
+const MARKETPLACES = [
+  { id: 'trendyol', name: 'Trendyol', syncable: true },
+  { id: 'n11', name: 'N11', syncable: true },
+  { id: 'hepsiburada', name: 'Hepsiburada', syncable: false },
+  { id: 'ciceksepeti', name: 'ÇiçekSepeti', syncable: false },
+  { id: 'amazon', name: 'Amazon', syncable: false },
+];
+
+let token = null;
+let connections = {};
+
+function login(){
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  fetch('/api/login', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({email, password})
+  }).then(r => r.json()).then(data => {
+    if(data.error){
+      const el = document.getElementById('loginError');
+      el.textContent = data.error; el.classList.remove('hidden');
+      return;
+    }
+    if(data.role !== 'yonetici'){
+      const el = document.getElementById('loginError');
+      el.textContent = 'Bu panel sadece yöneticiler içindir. Barkod tarama ekranı için /app.html adresini kullan.';
+      el.classList.remove('hidden');
+      return;
+    }
+    token = data.token;
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('panelView').classList.remove('hidden');
+    document.getElementById('headerActions').classList.remove('hidden');
+    loadConnections();
+    checkNotifications();
+  });
+}
+
+// ---------- Bildirimler ----------
+let soundEnabled = localStorage.getItem('sevkio_sound_enabled') !== 'false';
+updateSoundIcon();
+
+function updateSoundIcon(){
+  const el = document.getElementById('soundToggle');
+  el.textContent = soundEnabled ? '🔔' : '🔕';
+  el.style.opacity = soundEnabled ? '1' : '0.4';
+}
+
+function toggleSound(){
+  soundEnabled = !soundEnabled;
+  localStorage.setItem('sevkio_sound_enabled', soundEnabled);
+  updateSoundIcon();
+}
+
+function playBeep(){
+  if (!soundEnabled) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
+function showToast(text){
+  const box = document.getElementById('toastBox');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = text;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
+function checkNotifications(){
+  if (!token) return;
+  fetch('/api/notifications/unseen', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      if (!Array.isArray(list) || !list.length) return;
+      list.forEach(o => showToast(`<b>Yeni sipariş</b> — ${o.marketplace} · ${o.marketplace_order_no}${o.customer_name ? ' · ' + o.customer_name : ''}`));
+      playBeep();
+      fetch('/api/notifications/mark-seen', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ ids: list.map(o => o.id) })
+      });
+    }).catch(() => {});
+}
+setInterval(checkNotifications, 20000);
+
+// ---------- İade Yönetimi ----------
+function loadReturns(){
+  fetch('/api/returns', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      const box = document.getElementById('retRows');
+      if (list.error) { box.innerHTML = `<div class="msg msg-err">${list.error}</div>`; return; }
+      box.innerHTML = list.map(r => `
+        <div class="ret-row">
+          <div>
+            <div>${r.product_name} <span style="color:var(--muted);font-size:12px;">× ${r.quantity}</span></div>
+            <div style="color:var(--muted);font-size:12px;">${r.sku} · ${r.reason || 'sebep belirtilmedi'} · bildiren: ${r.requested_by_name || '—'}</div>
+          </div>
+          <div class="row-actions">
+            <span class="ret-status ${r.status}">${r.status}</span>
+            ${r.status === 'bekliyor' ? `
+              <button class="btn-primary btn-sm" onclick="resolveReturn(${r.id}, 'approve')">Onayla</button>
+              <button class="btn-ghost btn-sm" onclick="resolveReturn(${r.id}, 'reject')">Reddet</button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('') || '<div style="color:var(--muted);font-size:13px;">Henüz iade kaydı yok.</div>';
+    });
+}
+
+function resolveReturn(id, action){
+  fetch(`/api/returns/${id}/${action}`, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + token }
+  }).then(r => r.json()).then(data => {
+    if (data.error) { alert(data.error); return; }
+    loadReturns();
+  });
+}
+
+function loadConnections(){
+  fetch('/api/marketplace-connections', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      connections = {};
+      list.forEach(c => connections[c.marketplace] = c);
+      render();
+    });
+}
+
+function render(){
+  const box = document.getElementById('mpList');
+  box.innerHTML = '';
+  MARKETPLACES.forEach(mp => {
+    const conn = connections[mp.id];
+    const row = document.createElement('div');
+    row.className = 'mp-row';
+    row.innerHTML = `
+      <div>
+        <div class="mp-name">${mp.name}</div>
+        <div style="margin-top:4px;">
+          ${!mp.syncable ? '<span class="badge badge-soon">yakında</span>' :
+            conn ? `<span class="badge ${conn.is_active ? 'badge-active' : 'badge-inactive'}">${conn.is_active ? 'aktif' : 'kapalı'}</span> <span style="color:var(--muted);font-size:12px;">satıcı: ${conn.seller_id}</span>`
+            : '<span class="badge badge-none">bağlı değil</span>'}
+        </div>
+      </div>
+      <div class="row-actions">
+        ${mp.syncable && conn ? `<div class="toggle ${conn.is_active ? 'on' : ''}" onclick="toggleConn('${mp.id}')"><div class="toggle-dot"></div></div>` : ''}
+        ${mp.syncable ? `<button class="btn-ghost btn-sm" onclick="toggleForm('${mp.id}')">${conn ? 'Düzenle' : 'Bağla'}</button>` : ''}
+        ${mp.syncable && conn && conn.is_active ? `<button class="btn-primary btn-sm" onclick="syncNow('${mp.id}')">Siparişleri Çek</button>` : ''}
+      </div>
+    `;
+    box.appendChild(row);
+
+    const formBox = document.createElement('div');
+    formBox.id = 'form-' + mp.id;
+    formBox.className = 'form-box hidden';
+    formBox.innerHTML = `
+      <label>Satıcı ID (sellerId)</label>
+      <input id="sellerId-${mp.id}" value="${conn ? conn.seller_id : ''}">
+      <label>API Key</label>
+      <input id="apiKey-${mp.id}" placeholder="değiştirmek istemiyorsan boş bırak">
+      <label>API Secret</label>
+      <input id="apiSecret-${mp.id}" placeholder="değiştirmek istemiyorsan boş bırak">
+      <label>Ortam</label>
+      <select id="environment-${mp.id}">
+        <option value="prod" ${conn && conn.environment==='prod' ? 'selected':''}>Canlı (prod)</option>
+        <option value="stage" ${conn && conn.environment==='stage' ? 'selected':''}>Test (stage)</option>
+      </select>
+      <button class="btn-primary btn-sm" style="margin-top:14px;" onclick="saveConn('${mp.id}')">Kaydet</button>
+      <div id="msg-${mp.id}"></div>
+    `;
+    box.appendChild(formBox);
+  });
+}
+
+function toggleForm(marketplace){
+  document.getElementById('form-' + marketplace).classList.toggle('hidden');
+}
+
+function saveConn(marketplace){
+  const sellerId = document.getElementById('sellerId-' + marketplace).value;
+  const apiKey = document.getElementById('apiKey-' + marketplace).value;
+  const apiSecret = document.getElementById('apiSecret-' + marketplace).value;
+  const environment = document.getElementById('environment-' + marketplace).value;
+  fetch('/api/marketplace-connections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ marketplace, sellerId, apiKey, apiSecret, environment })
+  }).then(r => r.json()).then(data => {
+    const msg = document.getElementById('msg-' + marketplace);
+    if(data.error){ msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">Kaydedildi.</div>`;
+    loadConnections();
+  });
+}
+
+function toggleConn(marketplace){
+  fetch('/api/marketplace-connections/' + marketplace + '/toggle', {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + token }
+  }).then(r => r.json()).then(() => loadConnections());
+}
+
+function syncNow(marketplace){
+  fetch('/api/sync/' + marketplace, {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token }
+  }).then(r => r.json()).then(data => {
+    if(data.error){ alert(data.error); return; }
+    alert(`${marketplace}: ${data.created} yeni sipariş, ${data.updated} güncellendi.`);
+  });
+}
+function showTab(tab){
+  document.getElementById('tab-mp').classList.toggle('active', tab === 'mp');
+  document.getElementById('tab-emp').classList.toggle('active', tab === 'emp');
+  document.getElementById('tab-prod').classList.toggle('active', tab === 'prod');
+  document.getElementById('tab-ret').classList.toggle('active', tab === 'ret');
+  document.getElementById('tab-ord').classList.toggle('active', tab === 'ord');
+  document.getElementById('mpList').classList.toggle('hidden', tab !== 'mp');
+  document.getElementById('empView').classList.toggle('hidden', tab !== 'emp');
+  document.getElementById('prodView').classList.toggle('hidden', tab !== 'prod');
+  document.getElementById('retView').classList.toggle('hidden', tab !== 'ret');
+  document.getElementById('ordView').classList.toggle('hidden', tab !== 'ord');
+  if (tab === 'emp') loadEmployees();
+  if (tab === 'prod') loadProducts();
+  if (tab === 'ret') loadReturns();
+  if (tab === 'ord') loadOrders();
+}
+
+function loadEmployees(){
+  fetch('/api/users', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      const box = document.getElementById('empList');
+      if (list.error) { box.innerHTML = `<div class="msg msg-err">${list.error}</div>`; return; }
+      box.innerHTML = list.map(u => `
+        <div class="emp-row">
+          <div>
+            <div>${u.name}</div>
+            <div style="color:var(--muted);font-size:12px;">${u.email}</div>
+          </div>
+          <div class="row-actions">
+            <span class="role-badge ${u.role}">${u.role === 'yonetici' ? 'yönetici' : 'depo'}</span>
+            <button class="btn-ghost btn-sm" onclick="resetPassword(${u.id})">Şifre Sıfırla</button>
+            <button class="btn-ghost btn-sm" onclick="deleteEmployee(${u.id})">Sil</button>
+          </div>
+        </div>
+      `).join('') || '<div style="color:var(--muted);font-size:13px;">Henüz çalışan eklenmedi.</div>';
+    });
+}
+
+function addEmployee(){
+  const name = document.getElementById('emp-name').value;
+  const email = document.getElementById('emp-email').value;
+  const password = document.getElementById('emp-password').value;
+  const role = document.getElementById('emp-role').value;
+  fetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ name, email, password, role })
+  }).then(r => r.json()).then(data => {
+    const msg = document.getElementById('emp-msg');
+    if (data.error) { msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">Çalışan eklendi.</div>`;
+    document.getElementById('emp-name').value = '';
+    document.getElementById('emp-email').value = '';
+    document.getElementById('emp-password').value = '';
+    loadEmployees();
+  });
+}
+
+function deleteEmployee(id){
+  if (!confirm('Bu çalışanı silmek istediğine emin misin?')) return;
+  fetch('/api/users/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(() => loadEmployees());
+}
+
+function resetPassword(id){
+  const newPassword = prompt('Bu kullanıcı için yeni şifre gir (en az 6 karakter):');
+  if (!newPassword) return;
+  fetch('/api/users/' + id + '/reset-password', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ newPassword })
+  }).then(r => r.json()).then(data => {
+    if (data.error) { alert(data.error); return; }
+    alert('Şifre sıfırlandı. Yeni şifreyi çalışana ilet.');
+  });
+}
+
+// ---------- Sipariş Listesi ----------
+const ORDER_STATUS_LABEL = { yeni: 'Yeni', kargoda: 'Kargoda', teslim: 'Teslim', iptal: 'İptal' };
+
+function loadOrders(){
+  const status = document.getElementById('ord-filter-status').value;
+  const marketplace = document.getElementById('ord-filter-mp').value;
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (marketplace) params.set('marketplace', marketplace);
+  fetch('/api/orders?' + params, { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      document.getElementById('ordRows').innerHTML = list.map(o => `
+        <tr>
+          <td>
+            <div>${o.marketplace} · ${o.marketplace_order_no}</div>
+            <div style="color:var(--muted);font-size:11px;font-family:'JetBrains Mono',monospace;">${o.cargo_barcode}</div>
+          </td>
+          <td>${o.customer_name || '—'}</td>
+          <td>${o.item_count}</td>
+          <td><span class="badge badge-${o.status === 'yeni' ? 'none' : o.status === 'kargoda' ? 'active' : o.status === 'iptal' ? 'inactive' : 'none'}">${ORDER_STATUS_LABEL[o.status] || o.status}</span></td>
+          <td style="color:var(--muted);font-size:12px;">${new Date(o.created_at).toLocaleDateString('tr-TR')}</td>
+          <td>${(o.status === 'yeni') ? `<button class="btn-primary btn-sm" onclick="shipFromList(${o.id})">Kargoya Ver</button>` : ''}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="6" style="color:var(--muted);">Sipariş bulunamadı.</td></tr>';
+    });
+}
+
+function shipFromList(orderId){
+  fetch('/api/orders/' + orderId + '/ship', { method: 'POST', headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(data => {
+      if (data.error) { alert(data.error); return; }
+      loadOrders();
+    });
+}
+
+// ---------- Ürün Yönetimi ----------
+let allProducts = [];
+let editingProductId = null;
+let prodScanner = null;
+
+function loadProducts(){
+  fetch('/api/products', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      allProducts = Array.isArray(list) ? list : [];
+      renderProducts();
+    });
+}
+
+function renderProducts(){
+  const search = (document.getElementById('prod-search').value || '').toLowerCase();
+  const filtered = allProducts.filter(p =>
+    p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search)
+  );
+  document.getElementById('prodRows').innerHTML = filtered.map(p => `
+    <tr class="${p.is_low_stock ? 'low-stock' : ''}">
+      <td>
+        <div>${p.name}${p.variant_label ? ` <span style="color:var(--muted);">(${p.variant_label})</span>` : ''}</div>
+        <div style="color:var(--muted);font-size:11px;font-family:'JetBrains Mono',monospace;">${p.sku}${p.barcode ? ' · ' + p.barcode : ''}</div>
+      </td>
+      <td style="color:var(--muted);">${p.category || '—'}</td>
+      <td><span class="stock-num ${p.is_low_stock ? 'low' : ''}">${p.stock}</span></td>
+      <td>${p.price ? '₺' + Number(p.price).toFixed(2) : '—'}</td>
+      <td>%${p.vat_rate}</td>
+      <td>
+        <button class="btn-ghost btn-sm" onclick="editProduct(${p.id})">Düzenle</button>
+        <button class="btn-ghost btn-sm" onclick="deleteProduct(${p.id})">Sil</button>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="color:var(--muted);">Ürün bulunamadı.</td></tr>';
+}
+
+function editProduct(id){
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  editingProductId = id;
+  document.getElementById('prod-form-title').textContent = 'Ürünü Düzenle: ' + p.name;
+  document.getElementById('p-sku').value = p.sku;
+  document.getElementById('p-sku').disabled = true;
+  document.getElementById('p-name').value = p.name;
+  document.getElementById('p-barcode').value = p.barcode || '';
+  document.getElementById('p-stock').value = p.stock;
+  document.getElementById('p-category').value = p.category || '';
+  document.getElementById('p-variant').value = p.variant_label || '';
+  document.getElementById('p-price').value = p.price || '';
+  document.getElementById('p-vat').value = p.vat_rate;
+  document.getElementById('p-low-enabled').checked = p.low_stock_alert_enabled;
+  document.getElementById('p-low-threshold').value = p.low_stock_threshold || '';
+  document.getElementById('p-cancel-edit').classList.remove('hidden');
+  window.scrollTo({ top: document.getElementById('prod-form-title').offsetTop, behavior: 'smooth' });
+}
+
+function cancelEditProduct(){
+  editingProductId = null;
+  document.getElementById('prod-form-title').textContent = 'Yeni Ürün Ekle';
+  document.getElementById('p-sku').disabled = false;
+  ['p-sku','p-name','p-barcode','p-category','p-variant','p-price','p-low-threshold'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('p-stock').value = 0;
+  document.getElementById('p-vat').value = '20';
+  document.getElementById('p-low-enabled').checked = false;
+  document.getElementById('p-cancel-edit').classList.add('hidden');
+}
+
+function saveProduct(){
+  const payload = {
+    sku: document.getElementById('p-sku').value,
+    name: document.getElementById('p-name').value,
+    barcode: document.getElementById('p-barcode').value || null,
+    stock: parseInt(document.getElementById('p-stock').value, 10) || 0,
+    category: document.getElementById('p-category').value || null,
+    variantLabel: document.getElementById('p-variant').value || null,
+    price: parseFloat(document.getElementById('p-price').value) || null,
+    vatRate: parseFloat(document.getElementById('p-vat').value),
+    lowStockAlertEnabled: document.getElementById('p-low-enabled').checked,
+    lowStockThreshold: parseInt(document.getElementById('p-low-threshold').value, 10) || null,
+  };
+  const msg = document.getElementById('prod-msg');
+  const url = editingProductId ? '/api/products/' + editingProductId : '/api/products';
+  const method = editingProductId ? 'PATCH' : 'POST';
+  fetch(url, {
+    method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify(payload)
+  }).then(r => r.json()).then(data => {
+    if (data.error) { msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">Kaydedildi.</div>`;
+    cancelEditProduct();
+    loadProducts();
+  });
+}
+
+function deleteProduct(id){
+  if (!confirm('Bu ürünü silmek istediğine emin misin?')) return;
+  fetch('/api/products/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(data => {
+      if (data.error) { alert(data.error); return; }
+      loadProducts();
+    });
+}
+
+function importCsv(){
+  const csv = document.getElementById('csv-input').value;
+  const msg = document.getElementById('csv-msg');
+  if (!csv.trim()) { msg.innerHTML = '<div class="msg msg-err">CSV metni boş.</div>'; return; }
+  fetch('/api/products/import-csv', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ csv })
+  }).then(r => r.json()).then(data => {
+    if (data.error) { msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">${data.created} yeni, ${data.updated} güncellendi${data.errors ? `, ${data.errors} satırda hata` : ''}.</div>`;
+    document.getElementById('csv-input').value = '';
+    loadProducts();
+  });
+}
+
+function toggleProdScanner(){
+  const box = document.getElementById('reader-product');
+  box.classList.toggle('hidden');
+  if (box.classList.contains('hidden')) {
+    if (prodScanner) { prodScanner.stop().catch(()=>{}); prodScanner = null; }
+    return;
+  }
+  prodScanner = new Html5Qrcode('reader-product');
+  prodScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 120 } },
+    (decodedText) => {
+      document.getElementById('p-barcode').value = decodedText;
+      prodScanner.stop().catch(()=>{});
+      box.classList.add('hidden');
+    },
+    () => {}
+  ).catch(() => {
+    box.innerHTML = '<div style="padding:14px;color:var(--muted);font-size:12px;">Kameraya erişilemedi.</div>';
+  });
+}
+</script>
+</body>
+</html>
