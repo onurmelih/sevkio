@@ -2,11 +2,63 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="refresh" content="0;url=/app.html">
-<script>location.replace('/app.html');</script>
-<title>Sevkio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Sevkio — Giriş</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B1F17; --surface:#122B21; --surface-2:#17362A;
+    --accent:#BEF264; --accent-dim:#5c7a1f;
+    --text:#F5FBF7; --muted:#8FA99C; --border:#1E3B2E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+  .stripe{height:6px;background:repeating-linear-gradient(90deg,var(--accent) 0 3px,transparent 3px 6px,var(--accent-dim) 6px 8px,transparent 8px 12px);}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;}
+  .logo{height:34px;margin-bottom:8px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:40px;text-align:center;}
+  .choices{display:flex;flex-direction:column;gap:16px;width:100%;max-width:420px;}
+  .choice{display:flex;align-items:center;gap:18px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px 24px;text-decoration:none;color:var(--text);transition:border-color .15s, transform .15s;}
+  .choice:hover{border-color:var(--accent);transform:translateY(-2px);}
+  .choice .icon{width:50px;height:50px;border-radius:12px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+  .choice.primary .icon{background:var(--accent);}
+  .choice-title{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;text-transform:uppercase;}
+  .choice-sub{color:var(--muted);font-size:13px;margin-top:2px;}
+  footer{text-align:center;padding:20px;color:var(--muted);font-size:12px;}
+  footer a{color:var(--muted);}
+</style>
 </head>
 <body>
-  <p>Yönlendiriliyor... yönlenmezse <a href="/app.html">buraya tıkla</a>.</p>
+  <div class="stripe"></div>
+  <main>
+    <img src="/logo-dark.png" alt="Sevkio" class="logo">
+    <div class="eyebrow">nereden giriş yapmak istiyorsun?</div>
+    <div class="choices">
+      <a href="/app.html" class="choice primary">
+        <div class="icon">📦</div>
+        <div>
+          <div class="choice-title">Çalışan Girişi</div>
+          <div class="choice-sub">Barkod okut, kargoya ver, iade bildir</div>
+        </div>
+      </a>
+      <a href="/panel.html" class="choice">
+        <div class="icon">🏢</div>
+        <div>
+          <div class="choice-title">Yönetici Girişi</div>
+          <div class="choice-sub">Pazaryerleri, ürünler, çalışanlar, siparişler</div>
+        </div>
+      </a>
+      <a href="/superadmin.html" class="choice">
+        <div class="icon">⚙️</div>
+        <div>
+          <div class="choice-title">Süper Admin</div>
+          <div class="choice-sub">Firma yönetimi (sadece platform sahibi)</div>
+        </div>
+      </a>
+    </div>
+  </main>
+  <footer>Sevkio · <a href="https://sevkio.com">sevkio.com</a></footer>
 </body>
 </html>

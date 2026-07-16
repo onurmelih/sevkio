@@ -797,10 +797,6 @@ app.post('/api/products/import-csv', authMiddleware, requireRole('yonetici'), as
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
-// Bu proje artık sadece uygulama tarafı (pazarlama sitesi ayrı bir Vercel projesinde).
-// Kök adrese gelen istek çalışan giriş ekranına yönlendirilir.
-app.get('/', (req, res) => res.redirect('/app.html'));
-
 // ---------- Bildirimler: yeni gelen (henüz görülmemiş) siparişler ----------
 
 app.get('/api/notifications/unseen', authMiddleware, async (req, res) => {
