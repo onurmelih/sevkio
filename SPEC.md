@@ -103,3 +103,22 @@ Paketler arası fark sadece çalışan/depo limiti — pazaryeri sayısı tüm p
 - **E-posta gönderimi** (şifremi unuttum e-postası, sipariş bildirimi e-postası vs.): Resend.com ya da benzeri bir e-posta servisi hesabı + API key gerekiyor
 - **Ödeme sistemi**: iyzico/Shopier hesap kararı netleşince
 - **Gerçek e-Fatura**: Muhasebeci + bir e-Fatura entegratörü (Logo, Paraşüt, Uyumsoft vs.) hesabı
+
+## Bu Turda Tamamlanan Son 3 Madde
+- ~~Çalışan performans takibi~~ ✅ (kim ne zaman kargoya verdi, son 30 gün özeti)
+- ~~Paket limitleri + fiyatlandırma~~ ✅ (Start/Growth/Pro, çalışan/depo limiti otomatik uygulanıyor,
+  süper admin panelden firma paketini değiştirebiliyor, "Paketim" sekmesinde kullanım görünüyor)
+- ~~Çoklu depo desteği~~ ✅ (birden fazla depo/şube, ürün stoğu depo bazında, sipariş geldiğinde
+  hangi depodan karşılanacağı otomatik seçiliyor — tüm kalemleri karşılayan ilk depo, yoksa varsayılana düşer)
+- ~~Hepsiburada entegrasyonu~~ ✅ (temel akış: sipariş çekme, stok güncelleme, kargoya verildi bildirimi)
+  **ÖNEMLİ:** Hepsiburada'nın sipariş response yapısı gerçek bir hesapla doğrulanmadı (dokümantasyonları
+  örnek response göstermiyor). Gerçek hesapla ilk denemede alan adlarında (`lib/hepsiburada.js` içinde)
+  küçük düzeltmeler gerekebilir — bu normal, ilk denemede hangi hatayı alırsan bana ekran görüntüsüyle
+  ilet, birlikte düzeltiriz. HepsiJet'in kendi kargo/lojistik API'si (tamamen ayrı ve token bazlı) bu
+  kapsamda DEĞİL — ayrı bir iş olarak ele alınmalı.
+
+## Kalan Tek Madde
+- ÇiçekSepeti entegrasyonu (henüz araştırılmadı)
+- Amazon (SP-API çok karmaşık, öncelik değil, zamanlama belirsiz)
+- Ödeme sistemi (iyzico/Shopier hesap kararına bağlı)
+- KVKK/kullanım şartları metinleri (avukat/şablon gerekiyor)

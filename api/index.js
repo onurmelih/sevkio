@@ -7,6 +7,8 @@ const jwt = require('jsonwebtoken');
 const { query, ensureSchema } = require('../lib/db');
 const trendyol = require('../lib/trendyol');
 const n11 = require('../lib/n11');
+const hepsiburada = require('../lib/hepsiburada');
+const { getPlanLimits, PLAN_LIMITS } = require('../lib/plans');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'demo-gelistirme-anahtari-PRODUCTIONDA-DEGISTIR';
 
@@ -95,11 +97,12 @@ async function pushStockToMarketplaces(companyId, productId, newStock) {
   let pushed = 0;
 
   const { rows: connRows } = await query(
-    `SELECT * FROM marketplace_connections WHERE company_id=$1 AND marketplace IN ('trendyol','n11') AND is_active=1`,
+    `SELECT * FROM marketplace_connections WHERE company_id=$1 AND marketplace IN ('trendyol','n11','hepsiburada') AND is_active=1`,
     [companyId]
   );
   const trendyolConn = connRows.find(c => c.marketplace === 'trendyol');
   const n11Conn = connRows.find(c => c.marketplace === 'n11');
+  const hepsiburadaConn = connRows.find(c => c.marketplace === 'hepsiburada');
 
   if (trendyolConn && product?.barcode) {
     try {
@@ -121,9 +124,19 @@ async function pushStockToMarketplaces(companyId, productId, newStock) {
     }
   }
 
+  if (hepsiburadaConn && product?.sku) {
+    try {
+      await hepsiburada.updateStock(hepsiburadaConn, [{ merchantSku: product.sku, quantity: newStock }]);
+      console.log(`[HEPSIBURADA-GERÇEK] merchantSku ${product.sku} stok = ${newStock}`);
+      pushed++;
+    } catch (err) {
+      console.error('Hepsiburada stok güncelleme hatası:', err.message, err.data || '');
+    }
+  }
+
   const { rows: mappings } = await query(
     `SELECT marketplace, marketplace_product_id FROM marketplace_mappings
-     WHERE company_id=$1 AND product_id=$2 AND marketplace NOT IN ('trendyol','n11')`,
+     WHERE company_id=$1 AND product_id=$2 AND marketplace NOT IN ('trendyol','n11','hepsiburada')`,
     [companyId, productId]
   );
   for (const m of mappings) {
@@ -189,25 +202,57 @@ app.post('/api/orders/:id/ship', authMiddleware, async (req, res) => {
   }
 
   const { rows: items } = await query(`SELECT * FROM order_items WHERE order_id = $1`, [order.id]);
+  const { rows: warehouses } = await query(
+    `SELECT * FROM warehouses WHERE company_id=$1 ORDER BY is_default DESC, id ASC`, [req.companyId]
+  );
+
+  // Hangi depodan karşılanacağını otomatik seç: tüm kalemler için yeterli stoğu olan
+  // ilk depo (varsayılan depo öncelikli). Hiçbiri tam karşılayamıyorsa varsayılan depoyu kullan
+  // (best-effort, negatif stoğa düşürmez, 0'da durur — önceki tek-depolu davranışla aynı).
+  let chosenWarehouse = warehouses[0];
+  for (const wh of warehouses) {
+    const { rows: stockRows } = await query(
+      `SELECT product_id, stock FROM warehouse_stock WHERE warehouse_id=$1 AND product_id = ANY($2::int[])`,
+      [wh.id, items.map(i => i.product_id)]
+    );
+    const stockMap = {};
+    stockRows.forEach(r => stockMap[r.product_id] = r.stock);
+    const coversAll = items.every(item => (stockMap[item.product_id] || 0) >= item.quantity);
+    if (coversAll) { chosenWarehouse = wh; break; }
+  }
 
   const client = await require('../lib/db').pool.connect();
   const updatedStocks = [];
   try {
     await client.query('BEGIN');
     for (const item of items) {
-      const { rows: prodRows } = await client.query(`SELECT * FROM products WHERE id = $1`, [item.product_id]);
-      const product = prodRows[0];
-      const newStock = Math.max(0, product.stock - item.quantity);
-      await client.query(`UPDATE products SET stock = $1 WHERE id = $2`, [newStock, product.id]);
+      const { rows: wsRows } = await client.query(
+        `SELECT * FROM warehouse_stock WHERE warehouse_id=$1 AND product_id=$2`,
+        [chosenWarehouse.id, item.product_id]
+      );
+      const currentWhStock = wsRows[0]?.stock || 0;
+      const newWhStock = Math.max(0, currentWhStock - item.quantity);
+      await client.query(`
+        INSERT INTO warehouse_stock (warehouse_id, product_id, stock) VALUES ($1,$2,$3)
+        ON CONFLICT (warehouse_id, product_id) DO UPDATE SET stock = $3
+      `, [chosenWarehouse.id, item.product_id, newWhStock]);
+
+      // products.stock, tüm depoların toplamının önbelleğidir — yeniden hesaplanır.
+      const { rows: [{ total }] } = await client.query(
+        `SELECT COALESCE(SUM(stock),0) AS total FROM warehouse_stock WHERE product_id=$1`,
+        [item.product_id]
+      );
+      await client.query(`UPDATE products SET stock = $1 WHERE id = $2`, [total, item.product_id]);
+
       await client.query(
         `INSERT INTO stock_log (company_id, product_id, change, reason, order_id) VALUES ($1,$2,$3,'siparis',$4)`,
-        [req.companyId, product.id, -item.quantity, order.id]
+        [req.companyId, item.product_id, -item.quantity, order.id]
       );
-      updatedStocks.push({ productId: product.id, newStock });
+      updatedStocks.push({ productId: item.product_id, newStock: total });
     }
     await client.query(
-      `UPDATE orders SET status = 'kargoda', billed = 1, shipped_by = $1, shipped_at = now() WHERE id = $2`,
-      [req.userId, order.id]
+      `UPDATE orders SET status = 'kargoda', billed = 1, shipped_by = $1, shipped_at = now(), warehouse_id = $2 WHERE id = $3`,
+      [req.userId, chosenWarehouse.id, order.id]
     );
 
     const period = new Date().toISOString().slice(0, 7);
@@ -267,7 +312,24 @@ app.post('/api/orders/:id/ship', authMiddleware, async (req, res) => {
     }
   }
 
-  res.json({ ok: true, status: 'kargoda', marketplacesUpdated: pushedTo, trendyolPackageUpdate, n11PackageUpdate });
+  let hepsiburadaPackageUpdate = null;
+  if (order.marketplace === 'hepsiburada' && order.marketplace_package_id) {
+    const { rows: connRows4 } = await query(
+      `SELECT * FROM marketplace_connections WHERE company_id=$1 AND marketplace='hepsiburada' AND is_active=1`,
+      [req.companyId]
+    );
+    if (connRows4[0]) {
+      try {
+        await hepsiburada.markInTransit(connRows4[0], order.marketplace_package_id);
+        hepsiburadaPackageUpdate = 'basarili';
+      } catch (err) {
+        console.error('Hepsiburada paket statü hatası:', err.message, err.data || '');
+        hepsiburadaPackageUpdate = 'hata';
+      }
+    }
+  }
+
+  res.json({ ok: true, status: 'kargoda', marketplacesUpdated: pushedTo, trendyolPackageUpdate, n11PackageUpdate, hepsiburadaPackageUpdate });
 });
 
 // ---------- Pazaryeri bağlantı bilgileri (arkadaşının gerçek Trendyol hesabı) ----------
@@ -336,11 +398,35 @@ app.post('/api/users', authMiddleware, requireRole('yonetici'), async (req, res)
   const { rows: existing } = await query(`SELECT id FROM users WHERE email=$1`, [email]);
   if (existing[0]) return res.status(409).json({ error: 'Bu e-posta zaten kullanılıyor' });
 
+  const { rows: [company] } = await query(`SELECT plan FROM companies WHERE id=$1`, [req.companyId]);
+  const limits = getPlanLimits(company.plan);
+  if (limits.employeeLimit !== null) {
+    const { rows: [{ count }] } = await query(`SELECT COUNT(*) FROM users WHERE company_id=$1`, [req.companyId]);
+    if (parseInt(count, 10) >= limits.employeeLimit) {
+      return res.status(403).json({
+        error: `${limits.label} paketinde en fazla ${limits.employeeLimit} çalışan hesabı olabilir. Daha fazlası için üst pakete geçmen gerekiyor.`
+      });
+    }
+  }
+
   const { rows: [user] } = await query(`
     INSERT INTO users (company_id, name, email, password_hash, role)
     VALUES ($1,$2,$3,$4,$5) RETURNING id, name, email, role
   `, [req.companyId, name, email, bcrypt.hashSync(password, 8), role]);
   res.json({ ok: true, user });
+});
+
+app.get('/api/plan', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { rows: [company] } = await query(`SELECT plan, plan_status FROM companies WHERE id=$1`, [req.companyId]);
+  const { rows: [{ count: employeeCount }] } = await query(`SELECT COUNT(*) FROM users WHERE company_id=$1`, [req.companyId]);
+  const { rows: [{ count: warehouseCount }] } = await query(`SELECT COUNT(*) FROM warehouses WHERE company_id=$1`, [req.companyId]);
+  res.json({
+    plan: company.plan,
+    planStatus: company.plan_status,
+    limits: getPlanLimits(company.plan),
+    usage: { employeeCount: parseInt(employeeCount, 10), warehouseCount: parseInt(warehouseCount, 10) },
+    allPlans: PLAN_LIMITS,
+  });
 });
 
 app.delete('/api/users/:id', authMiddleware, requireRole('yonetici'), async (req, res) => {
@@ -515,6 +601,97 @@ async function syncN11ForCompany(companyId, conn) {
   return { created, updated, total: packages.length };
 }
 
+// Hepsiburada'nın paket/sipariş response yapısı gerçek bir hesapla test edilip
+// doğrulanmadı (Hepsiburada dokümantasyonu örnek response göstermiyor) — alan adları
+// (status, items, merchantSku vs.) en yaygın kullanılan isimlendirmeye göre yazıldı.
+// Gerçek hesapla ilk denemede alan adlarında küçük düzeltme gerekebilir.
+async function syncHepsiburadaForCompany(companyId, conn) {
+  const endDate = Date.now();
+  const startDate = endDate - 14 * 24 * 60 * 60 * 1000;
+  const data = await hepsiburada.getOrders(conn, { startDate, endDate, limit: 50, offset: 0 });
+
+  const packages = data?.items || data?.data || (Array.isArray(data) ? data : []);
+  const statusMap = {
+    Open: 'yeni', Packaged: 'yeni', Invoiced: 'kargoda', Shipped: 'kargoda',
+    InTransit: 'kargoda', Delivered: 'teslim', Cancelled: 'iptal', UnDelivered: 'kargoda',
+  };
+
+  let created = 0, updated = 0;
+
+  for (const pkg of packages) {
+    const packageNumber = pkg.packageNumber || pkg.PackageNumber || String(pkg.id || '');
+    const cargoBarcode = pkg.cargoTrackingNumber || pkg.trackingNumber || packageNumber;
+    const localStatus = statusMap[pkg.status || pkg.packageStatus] || 'yeni';
+    const customerName = pkg.customer?.name || pkg.recipientName || pkg.customerName || '';
+    const customerAddress = pkg.shippingAddress?.address || pkg.deliveryAddress || '';
+
+    const { rows: existingRows } = await query(
+      `SELECT id FROM orders WHERE company_id=$1 AND cargo_barcode=$2`, [companyId, cargoBarcode]
+    );
+
+    if (existingRows[0]) {
+      await query(
+        `UPDATE orders SET status=$1, marketplace_package_id=$2 WHERE id=$3`,
+        [localStatus, packageNumber, existingRows[0].id]
+      );
+      updated++;
+      continue;
+    }
+
+    const { rows: [newOrder] } = await query(`
+      INSERT INTO orders (company_id, marketplace, marketplace_order_no, cargo_barcode, customer_name, customer_address, status, marketplace_package_id)
+      VALUES ($1,'hepsiburada',$2,$3,$4,$5,$6,$7) RETURNING id
+    `, [companyId, pkg.orderNumber || packageNumber, cargoBarcode, customerName, customerAddress, localStatus, packageNumber]);
+    created++;
+
+    const lines = pkg.items || pkg.lines || [];
+    for (const line of lines) {
+      const barcode = line.barcode || null;
+      const sku = line.merchantSku || line.MerchantSku || barcode;
+      if (!sku) continue;
+
+      let productId = null;
+      const { rows: prodRows } = await query(
+        `SELECT id FROM products WHERE company_id=$1 AND sku=$2`, [companyId, sku]
+      );
+      if (prodRows[0]) {
+        productId = prodRows[0].id;
+      } else {
+        const { rows: [newProduct] } = await query(`
+          INSERT INTO products (company_id, sku, name, barcode, stock) VALUES ($1,$2,$3,$4,0)
+          ON CONFLICT (company_id, sku) DO UPDATE SET name = EXCLUDED.name
+          RETURNING id
+        `, [companyId, sku, line.productName || sku, barcode]);
+        productId = newProduct.id;
+      }
+      await query(
+        `INSERT INTO order_items (order_id, product_id, quantity) VALUES ($1,$2,$3)`,
+        [newOrder.id, productId, line.quantity || 1]
+      );
+    }
+  }
+
+  return { created, updated, total: packages.length };
+}
+
+app.post('/api/sync/hepsiburada', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { rows: connRows } = await query(
+    `SELECT * FROM marketplace_connections WHERE company_id=$1 AND marketplace='hepsiburada' AND is_active=1`,
+    [req.companyId]
+  );
+  const conn = connRows[0];
+  if (!conn) {
+    return res.status(400).json({ error: 'Önce POST /api/marketplace-connections ile Hepsiburada bilgilerini kaydet' });
+  }
+  try {
+    const result = await syncHepsiburadaForCompany(req.companyId, conn);
+    res.json({ ok: true, created: result.created, updated: result.updated, totalFromHepsiburada: result.total });
+  } catch (err) {
+    console.error('Hepsiburada sipariş çekme hatası:', err.message, err.data || '');
+    res.status(502).json({ error: 'Hepsiburada siparişleri çekilemedi: ' + err.message, detail: err.data });
+  }
+});
+
 app.post('/api/sync/trendyol', authMiddleware, requireRole('yonetici'), async (req, res) => {
   const { rows: connRows } = await query(
     `SELECT * FROM marketplace_connections WHERE company_id=$1 AND marketplace='trendyol' AND is_active=1`,
@@ -564,15 +741,19 @@ app.get('/api/cron/sync-all', async (req, res) => {
   }
 
   const { rows: connections } = await query(
-    `SELECT * FROM marketplace_connections WHERE is_active=1 AND marketplace IN ('trendyol','n11')`
+    `SELECT * FROM marketplace_connections WHERE is_active=1 AND marketplace IN ('trendyol','n11','hepsiburada')`
   );
+
+  const syncFns = {
+    trendyol: syncTrendyolForCompany,
+    n11: syncN11ForCompany,
+    hepsiburada: syncHepsiburadaForCompany,
+  };
 
   const results = [];
   for (const conn of connections) {
     try {
-      const result = conn.marketplace === 'trendyol'
-        ? await syncTrendyolForCompany(conn.company_id, conn)
-        : await syncN11ForCompany(conn.company_id, conn);
+      const result = await syncFns[conn.marketplace](conn.company_id, conn);
       results.push({ companyId: conn.company_id, marketplace: conn.marketplace, ...result });
     } catch (err) {
       console.error(`Cron senkron hatası (firma ${conn.company_id}, ${conn.marketplace}):`, err.message);
@@ -630,18 +811,30 @@ app.patch('/api/returns/:id/approve', authMiddleware, requireRole('yonetici'), a
   if (!ret) return res.status(404).json({ error: 'İade kaydı bulunamadı' });
   if (ret.status !== 'bekliyor') return res.status(400).json({ error: 'Bu iade zaten işlendi' });
 
-  const { rows: [product] } = await query(`SELECT * FROM products WHERE id=$1`, [ret.product_id]);
-  const newStock = product.stock + ret.quantity;
+  const { rows: [defaultWh] } = await query(
+    `SELECT id FROM warehouses WHERE company_id=$1 ORDER BY is_default DESC, id ASC LIMIT 1`, [req.companyId]
+  );
+  const { rows: wsRows } = await query(
+    `SELECT stock FROM warehouse_stock WHERE warehouse_id=$1 AND product_id=$2`, [defaultWh.id, ret.product_id]
+  );
+  const newWhStock = (wsRows[0]?.stock || 0) + ret.quantity;
+  await query(`
+    INSERT INTO warehouse_stock (warehouse_id, product_id, stock) VALUES ($1,$2,$3)
+    ON CONFLICT (warehouse_id, product_id) DO UPDATE SET stock = $3
+  `, [defaultWh.id, ret.product_id, newWhStock]);
 
-  await query(`UPDATE products SET stock=$1 WHERE id=$2`, [newStock, product.id]);
+  const { rows: [{ total: newStock }] } = await query(
+    `SELECT COALESCE(SUM(stock),0) AS total FROM warehouse_stock WHERE product_id=$1`, [ret.product_id]
+  );
+  await query(`UPDATE products SET stock=$1 WHERE id=$2`, [newStock, ret.product_id]);
   await query(`
     INSERT INTO stock_log (company_id, product_id, change, reason, order_id) VALUES ($1,$2,$3,'iade',$4)
-  `, [req.companyId, product.id, ret.quantity, ret.order_id]);
+  `, [req.companyId, ret.product_id, ret.quantity, ret.order_id]);
   await query(`
     UPDATE returns SET status='onaylandi', approved_by=$1, resolved_at=now() WHERE id=$2
   `, [req.userId, ret.id]);
 
-  const pushed = await pushStockToMarketplaces(req.companyId, product.id, newStock);
+  const pushed = await pushStockToMarketplaces(req.companyId, ret.product_id, newStock);
   res.json({ ok: true, newStock, marketplacesUpdated: pushed });
 });
 
@@ -665,12 +858,13 @@ app.get('/api/orders', authMiddleware, requireRole('yonetici'), async (req, res)
   params.push(Math.min(parseInt(limit, 10) || 100, 300));
 
   const { rows } = await query(`
-    SELECT o.*, COALESCE(SUM(oi.quantity), 0) AS item_count, u.name AS shipped_by_name
+    SELECT o.*, COALESCE(SUM(oi.quantity), 0) AS item_count, u.name AS shipped_by_name, w.name AS warehouse_name
     FROM orders o
     LEFT JOIN order_items oi ON oi.order_id = o.id
     LEFT JOIN users u ON u.id = o.shipped_by
+    LEFT JOIN warehouses w ON w.id = o.warehouse_id
     WHERE ${conditions.join(' AND ')}
-    GROUP BY o.id, u.name ORDER BY o.created_at DESC LIMIT $${params.length}
+    GROUP BY o.id, u.name, w.name ORDER BY o.created_at DESC LIMIT $${params.length}
   `, params);
   res.json(rows);
 });
@@ -694,6 +888,91 @@ app.get('/api/reports/performance', authMiddleware, requireRole('yonetici'), asy
 
 // ---------- Ürün/stok listesi ----------
 
+// ---------- Çoklu Depo Yönetimi ----------
+
+app.get('/api/warehouses', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { rows } = await query(`
+    SELECT w.*, (SELECT COUNT(*) FROM orders o WHERE o.warehouse_id = w.id) AS order_count
+    FROM warehouses w WHERE company_id=$1 ORDER BY is_default DESC, id ASC
+  `, [req.companyId]);
+  res.json(rows);
+});
+
+app.post('/api/warehouses', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name zorunlu' });
+
+  const { rows: [company] } = await query(`SELECT plan FROM companies WHERE id=$1`, [req.companyId]);
+  const limits = getPlanLimits(company.plan);
+  if (limits.warehouseLimit !== null) {
+    const { rows: [{ count }] } = await query(`SELECT COUNT(*) FROM warehouses WHERE company_id=$1`, [req.companyId]);
+    if (parseInt(count, 10) >= limits.warehouseLimit) {
+      return res.status(403).json({
+        error: `${limits.label} paketinde en fazla ${limits.warehouseLimit} depo/şube olabilir. Daha fazlası için üst pakete geçmen gerekiyor.`
+      });
+    }
+  }
+
+  const { rows: [warehouse] } = await query(
+    `INSERT INTO warehouses (company_id, name, is_default) VALUES ($1,$2,false) RETURNING *`,
+    [req.companyId, name]
+  );
+  res.json({ ok: true, warehouse });
+});
+
+app.delete('/api/warehouses/:id', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { rows: whRows } = await query(
+    `SELECT * FROM warehouses WHERE id=$1 AND company_id=$2`, [req.params.id, req.companyId]
+  );
+  const wh = whRows[0];
+  if (!wh) return res.status(404).json({ error: 'Depo bulunamadı' });
+  if (wh.is_default) return res.status(400).json({ error: 'Varsayılan depo silinemez' });
+
+  const { rows: stockRows } = await query(
+    `SELECT COALESCE(SUM(stock),0) AS total FROM warehouse_stock WHERE warehouse_id=$1`, [wh.id]
+  );
+  if (parseInt(stockRows[0].total, 10) > 0) {
+    return res.status(400).json({ error: 'Bu depoda hâlâ stok var, önce stoğu sıfırla ya da başka depoya taşı' });
+  }
+
+  await query(`DELETE FROM warehouse_stock WHERE warehouse_id=$1`, [wh.id]);
+  await query(`DELETE FROM warehouses WHERE id=$1`, [wh.id]);
+  res.json({ ok: true });
+});
+
+app.get('/api/products/:id/warehouse-stock', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { rows } = await query(`
+    SELECT w.id AS warehouse_id, w.name AS warehouse_name, w.is_default, COALESCE(ws.stock, 0) AS stock
+    FROM warehouses w
+    LEFT JOIN warehouse_stock ws ON ws.warehouse_id = w.id AND ws.product_id = $1
+    WHERE w.company_id = $2 ORDER BY w.is_default DESC, w.id ASC
+  `, [req.params.id, req.companyId]);
+  res.json(rows);
+});
+
+app.patch('/api/products/:id/warehouse-stock', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { warehouseId, stock } = req.body;
+  if (!warehouseId || stock === undefined) return res.status(400).json({ error: 'warehouseId ve stock zorunlu' });
+
+  const { rows: whRows } = await query(
+    `SELECT id FROM warehouses WHERE id=$1 AND company_id=$2`, [warehouseId, req.companyId]
+  );
+  if (!whRows[0]) return res.status(404).json({ error: 'Depo bulunamadı' });
+
+  await query(`
+    INSERT INTO warehouse_stock (warehouse_id, product_id, stock) VALUES ($1,$2,$3)
+    ON CONFLICT (warehouse_id, product_id) DO UPDATE SET stock = $3
+  `, [warehouseId, req.params.id, Math.max(0, parseInt(stock, 10) || 0)]);
+
+  const { rows: [{ total }] } = await query(
+    `SELECT COALESCE(SUM(stock),0) AS total FROM warehouse_stock WHERE product_id=$1`, [req.params.id]
+  );
+  await query(`UPDATE products SET stock=$1 WHERE id=$2 AND company_id=$3`, [total, req.params.id, req.companyId]);
+
+  const pushed = await pushStockToMarketplaces(req.companyId, req.params.id, total);
+  res.json({ ok: true, totalStock: total, marketplacesUpdated: pushed });
+});
+
 app.get('/api/products', authMiddleware, async (req, res) => {
   const { rows } = await query(`
     SELECT *, (low_stock_alert_enabled AND stock <= COALESCE(low_stock_threshold, 0)) AS is_low_stock
@@ -701,6 +980,20 @@ app.get('/api/products', authMiddleware, async (req, res) => {
   `, [req.companyId]);
   res.json(rows);
 });
+
+// Tekli-depolu firmalar için: ürün ekle/düzenle/CSV içe aktarırken girilen stok,
+// otomatik olarak firmanın varsayılan deposuna yazılır. Çoklu depolu firmalar için
+// depo bazlı ince ayar /api/products/:id/warehouse-stock üzerinden yapılır.
+async function syncDefaultWarehouseStock(companyId, productId, stock) {
+  const { rows: [defaultWh] } = await query(
+    `SELECT id FROM warehouses WHERE company_id=$1 ORDER BY is_default DESC, id ASC LIMIT 1`, [companyId]
+  );
+  if (!defaultWh) return;
+  await query(`
+    INSERT INTO warehouse_stock (warehouse_id, product_id, stock) VALUES ($1,$2,$3)
+    ON CONFLICT (warehouse_id, product_id) DO UPDATE SET stock = $3
+  `, [defaultWh.id, productId, stock]);
+}
 
 app.post('/api/products', authMiddleware, requireRole('yonetici'), async (req, res) => {
   const { sku, name, barcode, stock, category, price, vatRate, lowStockThreshold, lowStockAlertEnabled, variantGroup, variantLabel } = req.body;
@@ -711,6 +1004,7 @@ app.post('/api/products', authMiddleware, requireRole('yonetici'), async (req, r
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *
     `, [req.companyId, sku, name, barcode || null, stock || 0, category || null, price || null,
         vatRate ?? 20, lowStockThreshold || null, !!lowStockAlertEnabled, variantGroup || null, variantLabel || null]);
+    await syncDefaultWarehouseStock(req.companyId, product.id, stock || 0);
     res.json({ ok: true, product });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Bu SKU ya da barkod zaten kullanılıyor' });
@@ -739,6 +1033,9 @@ app.patch('/api/products/:id', authMiddleware, requireRole('yonetici'), async (r
         lowStockThreshold || null, lowStockAlertEnabled, variantGroup || null, variantLabel || null,
         req.params.id, req.companyId]);
     if (!rows[0]) return res.status(404).json({ error: 'Ürün bulunamadı' });
+    if (stock !== undefined && stock !== null) {
+      await syncDefaultWarehouseStock(req.companyId, rows[0].id, rows[0].stock);
+    }
     res.json({ ok: true, product: rows[0] });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Bu barkod başka bir üründe kullanılıyor' });
@@ -802,12 +1099,14 @@ app.post('/api/products/import-csv', authMiddleware, requireRole('yonetici'), as
           UPDATE products SET name=$1, barcode=COALESCE($2,barcode), stock=$3, category=$4, price=$5, vat_rate=$6
           WHERE id=$7
         `, [name, barcode, stock, category, price, vatRate, existing[0].id]);
+        await syncDefaultWarehouseStock(req.companyId, existing[0].id, stock);
         updated++;
       } else {
-        await query(`
+        const { rows: [newProd] } = await query(`
           INSERT INTO products (company_id, sku, name, barcode, stock, category, price, vat_rate)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id
         `, [req.companyId, sku, name, barcode, stock, category, price, vatRate]);
+        await syncDefaultWarehouseStock(req.companyId, newProd.id, stock);
         created++;
       }
     } catch (err) {
@@ -883,7 +1182,7 @@ app.patch('/api/superadmin/leads/:id', superAdminMiddleware, async (req, res) =>
 
 app.get('/api/superadmin/companies', superAdminMiddleware, async (req, res) => {
   const { rows } = await query(`
-    SELECT c.id, c.name, c.plan_status, c.created_at,
+    SELECT c.id, c.name, c.plan_status, c.plan, c.created_at,
       (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id) AS user_count,
       (SELECT COUNT(*) FROM orders o WHERE o.company_id = c.id) AS order_count,
       (SELECT COALESCE(SUM(order_count),0) FROM billing_usage b WHERE b.company_id = c.id) AS total_billed_orders
@@ -920,6 +1219,19 @@ app.patch('/api/superadmin/companies/:id/status', superAdminMiddleware, async (r
   const { rows } = await query(
     `UPDATE companies SET plan_status=$1 WHERE id=$2 RETURNING id, name, plan_status`,
     [status, req.params.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Firma bulunamadı' });
+  res.json(rows[0]);
+});
+
+app.patch('/api/superadmin/companies/:id/plan', superAdminMiddleware, async (req, res) => {
+  const { plan } = req.body; // 'start' | 'growth' | 'pro'
+  if (!['start', 'growth', 'pro'].includes(plan)) {
+    return res.status(400).json({ error: 'Geçersiz paket' });
+  }
+  const { rows } = await query(
+    `UPDATE companies SET plan=$1 WHERE id=$2 RETURNING id, name, plan`,
+    [plan, req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Firma bulunamadı' });
   res.json(rows[0]);

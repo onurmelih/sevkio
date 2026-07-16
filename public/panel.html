@@ -111,6 +111,8 @@
         <div class="tab" id="tab-prod" onclick="showTab('prod')">Ürünler</div>
         <div class="tab" id="tab-ret" onclick="showTab('ret')">İadeler</div>
         <div class="tab" id="tab-ord" onclick="showTab('ord')">Siparişler</div>
+        <div class="tab" id="tab-wh" onclick="showTab('wh')">Depolar</div>
+        <div class="tab" id="tab-plan" onclick="showTab('plan')">Paketim</div>
       </div>
       <div class="card" id="mpList"></div>
 
@@ -177,6 +179,10 @@
             <button class="btn-ghost btn-sm hidden" id="p-cancel-edit" onclick="cancelEditProduct()">Vazgeç</button>
           </div>
           <div id="prod-msg"></div>
+          <div id="p-warehouse-stock" class="hidden" style="margin-top:16px;padding-top:14px;border-top:1px dashed var(--border);">
+            <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Depo bazlı stok</div>
+            <div id="p-wh-rows"></div>
+          </div>
         </div>
 
         <div class="form-box">
@@ -217,9 +223,23 @@
           <button class="btn-ghost btn-sm" onclick="loadOrders()">Yenile</button>
         </div>
         <table class="prod-table">
-          <thead><tr><th>Sipariş</th><th>Müşteri</th><th>Ürün Adedi</th><th>Durum</th><th>Kargoya Veren</th><th>Tarih</th><th></th></tr></thead>
+          <thead><tr><th>Sipariş</th><th>Müşteri</th><th>Ürün Adedi</th><th>Durum</th><th>Kargoya Veren</th><th>Depo</th><th>Tarih</th><th></th></tr></thead>
           <tbody id="ordRows"></tbody>
         </table>
+      </div>
+
+      <div class="card hidden" id="whView">
+        <div id="whRows"></div>
+        <div class="form-box">
+          <label>Yeni depo/şube adı</label>
+          <input id="wh-name" placeholder="Örnek: İstanbul Şube">
+          <button class="btn-primary btn-sm" style="margin-top:12px;" onclick="addWarehouse()">Depo Ekle</button>
+          <div id="wh-msg"></div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="planView">
+        <div id="planInfo"></div>
       </div>
     </section>
   </main>
@@ -228,7 +248,7 @@
 const MARKETPLACES = [
   { id: 'trendyol', name: 'Trendyol', syncable: true },
   { id: 'n11', name: 'N11', syncable: true },
-  { id: 'hepsiburada', name: 'Hepsiburada', syncable: false },
+  { id: 'hepsiburada', name: 'Hepsiburada', syncable: true },
   { id: 'ciceksepeti', name: 'ÇiçekSepeti', syncable: false },
   { id: 'amazon', name: 'Amazon', syncable: false },
 ];
@@ -447,15 +467,21 @@ function showTab(tab){
   document.getElementById('tab-prod').classList.toggle('active', tab === 'prod');
   document.getElementById('tab-ret').classList.toggle('active', tab === 'ret');
   document.getElementById('tab-ord').classList.toggle('active', tab === 'ord');
+  document.getElementById('tab-wh').classList.toggle('active', tab === 'wh');
+  document.getElementById('tab-plan').classList.toggle('active', tab === 'plan');
   document.getElementById('mpList').classList.toggle('hidden', tab !== 'mp');
   document.getElementById('empView').classList.toggle('hidden', tab !== 'emp');
   document.getElementById('prodView').classList.toggle('hidden', tab !== 'prod');
   document.getElementById('retView').classList.toggle('hidden', tab !== 'ret');
   document.getElementById('ordView').classList.toggle('hidden', tab !== 'ord');
+  document.getElementById('whView').classList.toggle('hidden', tab !== 'wh');
+  document.getElementById('planView').classList.toggle('hidden', tab !== 'plan');
   if (tab === 'emp') loadEmployees();
   if (tab === 'prod') loadProducts();
   if (tab === 'ret') loadReturns();
   if (tab === 'ord') loadOrders();
+  if (tab === 'wh') loadWarehouses();
+  if (tab === 'plan') loadPlan();
 }
 
 function loadEmployees(){
@@ -542,10 +568,11 @@ function loadOrders(){
           <td>${o.item_count}</td>
           <td><span class="badge badge-${o.status === 'yeni' ? 'none' : o.status === 'kargoda' ? 'active' : o.status === 'iptal' ? 'inactive' : 'none'}">${ORDER_STATUS_LABEL[o.status] || o.status}</span></td>
           <td style="color:var(--muted);font-size:12px;">${o.shipped_by_name || '—'}</td>
+          <td style="color:var(--muted);font-size:12px;">${o.warehouse_name || '—'}</td>
           <td style="color:var(--muted);font-size:12px;">${new Date(o.created_at).toLocaleDateString('tr-TR')}</td>
           <td>${(o.status === 'yeni') ? `<button class="btn-primary btn-sm" onclick="shipFromList(${o.id})">Kargoya Ver</button>` : ''}</td>
         </tr>
-      `).join('') || '<tr><td colspan="6" style="color:var(--muted);">Sipariş bulunamadı.</td></tr>';
+      `).join('') || '<tr><td colspan="7" style="color:var(--muted);">Sipariş bulunamadı.</td></tr>';
     });
 }
 
@@ -554,6 +581,69 @@ function shipFromList(orderId){
     .then(r => r.json()).then(data => {
       if (data.error) { alert(data.error); return; }
       loadOrders();
+    });
+}
+
+// ---------- Depolar ----------
+function loadWarehouses(){
+  fetch('/api/warehouses', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      document.getElementById('whRows').innerHTML = list.map(w => `
+        <div class="emp-row">
+          <div>
+            <div>${w.name} ${w.is_default ? '<span class="role-badge yonetici">varsayılan</span>' : ''}</div>
+            <div style="color:var(--muted);font-size:12px;">${w.order_count} sipariş bu depodan gönderildi</div>
+          </div>
+          <div class="row-actions">
+            ${!w.is_default ? `<button class="btn-ghost btn-sm" onclick="deleteWarehouse(${w.id})">Sil</button>` : ''}
+          </div>
+        </div>
+      `).join('') || '<div style="color:var(--muted);font-size:13px;">Henüz depo yok.</div>';
+    });
+}
+
+function addWarehouse(){
+  const name = document.getElementById('wh-name').value;
+  fetch('/api/warehouses', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ name })
+  }).then(r => r.json()).then(data => {
+    const msg = document.getElementById('wh-msg');
+    if (data.error) { msg.innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+    msg.innerHTML = `<div class="msg msg-ok">Depo eklendi.</div>`;
+    document.getElementById('wh-name').value = '';
+    loadWarehouses();
+  });
+}
+
+function deleteWarehouse(id){
+  if (!confirm('Bu depoyu silmek istediğine emin misin?')) return;
+  fetch('/api/warehouses/' + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(data => {
+      if (data.error) { alert(data.error); return; }
+      loadWarehouses();
+    });
+}
+
+// ---------- Paketim ----------
+const PLAN_NAMES = { start: 'Start', growth: 'Growth', pro: 'Pro' };
+
+function loadPlan(){
+  fetch('/api/plan', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(data => {
+      if (data.error) { document.getElementById('planInfo').innerHTML = `<div class="msg msg-err">${data.error}</div>`; return; }
+      const l = data.limits;
+      const empText = l.employeeLimit === null ? 'Sınırsız' : `${data.usage.employeeCount} / ${l.employeeLimit}`;
+      const whText = l.warehouseLimit === null ? 'Sınırsız' : `${data.usage.warehouseCount} / ${l.warehouseLimit}`;
+      document.getElementById('planInfo').innerHTML = `
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;text-transform:uppercase;color:var(--accent);">${PLAN_NAMES[data.plan]}</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:4px;">Durum: ${data.planStatus}</div>
+        <div class="divider" style="height:1px;background:var(--border);margin:16px 0;"></div>
+        <div style="margin-bottom:10px;">Taban ücret: <b>${l.basePrice}₺/ay</b> + sipariş başına <b>${l.perOrder}₺</b></div>
+        <div style="margin-bottom:10px;">Çalışan kullanımı: <b>${empText}</b></div>
+        <div>Depo/şube kullanımı: <b>${whText}</b></div>
+        <div style="color:var(--muted);font-size:12px;margin-top:16px;">Paket değişikliği için platform yöneticinle iletişime geç.</div>
+      `;
     });
 }
 
@@ -610,7 +700,36 @@ function editProduct(id){
   document.getElementById('p-low-enabled').checked = p.low_stock_alert_enabled;
   document.getElementById('p-low-threshold').value = p.low_stock_threshold || '';
   document.getElementById('p-cancel-edit').classList.remove('hidden');
+  loadProductWarehouseStock(id);
   window.scrollTo({ top: document.getElementById('prod-form-title').offsetTop, behavior: 'smooth' });
+}
+
+function loadProductWarehouseStock(productId){
+  fetch('/api/products/' + productId + '/warehouse-stock', { headers: { Authorization: 'Bearer ' + token } })
+    .then(r => r.json()).then(list => {
+      const box = document.getElementById('p-warehouse-stock');
+      if (!Array.isArray(list) || list.length <= 1) { box.classList.add('hidden'); return; }
+      box.classList.remove('hidden');
+      document.getElementById('p-wh-rows').innerHTML = list.map(w => `
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+          <div style="flex:1;font-size:13px;">${w.warehouse_name}${w.is_default ? ' (varsayılan)' : ''}</div>
+          <input type="number" style="width:90px;" id="wh-stock-${w.warehouse_id}" value="${w.stock}">
+          <button class="btn-ghost btn-sm" onclick="saveWarehouseStock(${productId}, ${w.warehouse_id})">Kaydet</button>
+        </div>
+      `).join('');
+    });
+}
+
+function saveWarehouseStock(productId, warehouseId){
+  const stock = parseInt(document.getElementById('wh-stock-' + warehouseId).value, 10) || 0;
+  fetch('/api/products/' + productId + '/warehouse-stock', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ warehouseId, stock })
+  }).then(r => r.json()).then(data => {
+    if (data.error) { alert(data.error); return; }
+    loadProducts();
+    loadProductWarehouseStock(productId);
+  });
 }
 
 function cancelEditProduct(){
@@ -622,6 +741,7 @@ function cancelEditProduct(){
   document.getElementById('p-vat').value = '20';
   document.getElementById('p-low-enabled').checked = false;
   document.getElementById('p-cancel-edit').classList.add('hidden');
+  document.getElementById('p-warehouse-stock').classList.add('hidden');
 }
 
 function saveProduct(){

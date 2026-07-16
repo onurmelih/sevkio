@@ -229,3 +229,44 @@ Artık **Trendyol ve N11** gerçek API'lerine bağlanıyor. Her ikisi de aynı m
 - Ürün ekleme/fiyat güncelleme ekranı (şu an sadece pazaryerinden otomatik senkronla geliyor)
 - Ödeme/abonelik akışı (iyzico/Stripe)
 - KVKK / kullanım şartları / gizlilik politikası metinleri
+
+## Bu Turda Eklenen Büyük 4 Özellik
+
+### 1) Çalışan Performans Takibi
+`/panel.html` → Çalışanlar sekmesinde her çalışanın yanında "son 30 günde X sipariş
+kargoladı" yazıyor. Siparişler sekmesinde de her siparişin kimin tarafından, hangi
+depodan kargoya verildiği görünüyor.
+
+### 2) Paket Limitleri + Fiyatlandırma
+Start/Growth/Pro paketleri artık gerçekten uygulanıyor:
+- Start: 3 çalışan, 1 depo
+- Growth: 10 çalışan, 3 depo
+- Pro: sınırsız
+
+Limitler otomatik kontrol ediliyor (limit dolunca yeni çalışan/depo eklenemiyor,
+anlamlı bir hata mesajı çıkıyor). Süper admin panelinden bir firmanın paketini
+değiştirebilirsin. `/panel.html` → "Paketim" sekmesinde firma kendi kullanımını görebiliyor.
+
+### 3) Çoklu Depo Desteği
+`/panel.html` → "Depolar" sekmesinden yeni depo/şube ekleyebilirsin (paket limitine tabi).
+Ürün düzenlerken, birden fazla depo varsa her deponun stoğunu ayrı ayrı girebiliyorsun.
+Sipariş kargoya verilirken, **hangi depoda o siparişin tüm ürünleri için yeterli stok
+varsa sistem otomatik o depoyu seçiyor** (yoksa varsayılan depoya düşer). Her firma
+otomatik olarak bir "Ana Depo" ile başlıyor, eski tek-depolu kullanım hiç bozulmuyor.
+
+### 4) Hepsiburada Entegrasyonu (temel akış)
+Trendyol/N11 ile aynı mantıkta: `/panel.html` → Pazaryerleri → Hepsiburada'ya bağlan,
+"Siparişleri Çek" de, "Kargoya Ver" dediğinde gerçek stok güncellemesi ve kargoya
+verildi bildirimi gönderiliyor.
+
+**Bilmen gereken önemli bir şey:** Hepsiburada'nın gerçek sipariş response yapısını
+(hangi alan "status", hangi alan "items" diye geliyor gibi) dokümantasyonlarında örnek
+göremediğim için en yaygın isimlendirmeye göre yazdım. Gerçek hesapla ilk denediğinde
+bir hata alırsan (muhtemelen "undefined" gibi bir şey, sipariş bilgisi eksik/yanlış
+görünmesi gibi) bu beklenen bir şey — ekran görüntüsünü/hata mesajını bana gönder,
+`lib/hepsiburada.js` içindeki alan adlarını gerçek veriye göre birlikte düzeltiriz.
+Trendyol ve N11'de bu sorun yaşanmadı çünkü onların dokümantasyonunda örnek response
+vardı, Hepsiburada'da yoktu.
+
+**HepsiJet (Hepsiburada'nın kendi kargo/lojistik sistemi) bu kapsamda DEĞİL** — tamamen
+ayrı, token tabanlı bir API, ayrı bir iş olarak ele alınmalı.

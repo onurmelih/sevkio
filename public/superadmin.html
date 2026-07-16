@@ -86,7 +86,7 @@
       <div class="section-title">Firmalar</div>
       <div class="card">
         <table>
-          <thead><tr><th>Firma</th><th>Durum</th><th>Kullanıcı</th><th>Sipariş</th><th></th></tr></thead>
+          <thead><tr><th>Firma</th><th>Durum</th><th>Paket</th><th>Kullanıcı</th><th>Sipariş</th><th></th></tr></thead>
           <tbody id="companyRows"></tbody>
         </table>
       </div>
@@ -167,6 +167,13 @@ function loadCompanies(){
         <tr>
           <td>${c.name}</td>
           <td><span class="badge badge-${c.plan_status}">${c.plan_status}</span></td>
+          <td>
+            <select class="status-select" onchange="updatePlan(${c.id}, this.value)">
+              <option value="start" ${c.plan==='start'?'selected':''}>Start</option>
+              <option value="growth" ${c.plan==='growth'?'selected':''}>Growth</option>
+              <option value="pro" ${c.plan==='pro'?'selected':''}>Pro</option>
+            </select>
+          </td>
           <td>${c.user_count}</td>
           <td>${c.order_count}</td>
           <td>
@@ -177,8 +184,16 @@ function loadCompanies(){
             </select>
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="5" class="tag">Henüz firma yok.</td></tr>';
+      `).join('') || '<tr><td colspan="6" class="tag">Henüz firma yok.</td></tr>';
     });
+}
+
+function updatePlan(id, plan){
+  fetch('/api/superadmin/companies/' + id + '/plan', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ plan })
+  }).then(() => loadCompanies());
 }
 
 function updateStatus(id, status){
