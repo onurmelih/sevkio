@@ -1,10 +1,9 @@
 # Kargo Tarama Sistemi — v0.2 (Bulut/Vercel'e Hazır)
 
 Bu sürüm artık **kimsenin bilgisayarında değil**, bulutta çalışacak şekilde kuruldu:
-
-* Veritabanı: gerçek, kalıcı bir bulut Postgres (yerelde SQLite değil)
-* Backend: Vercel'in sunucusuz (serverless) fonksiyon yapısına uygun
-* Frontend (PWA): statik dosya olarak Vercel'den servis ediliyor
+- Veritabanı: gerçek, kalıcı bir bulut Postgres (yerelde SQLite değil)
+- Backend: Vercel'in sunucusuz (serverless) fonksiyon yapısına uygun
+- Frontend (PWA): statik dosya olarak Vercel'den servis ediliyor
 
 Mantık aynı: pazaryeri API'leri hâlâ **mock (sahte)** — gerçek anahtarların gelince
 `api/index.js` içindeki `pushStockToMarketplaces` fonksiyonu gerçek isteklere dönüşecek.
@@ -14,10 +13,10 @@ Mantık aynı: pazaryeri API'leri hâlâ **mock (sahte)** — gerçek anahtarlar
 Pazarlama sitesi artık bu projede DEĞİL — ayrı bir "Sevkio Pazarlama Sitesi" paketinde
 (`sevkio-marketing-site.zip`), tamamen ayrı bir Vercel projesi olarak deploy ediliyor.
 
-* **Bu proje** (`sevkio` reposu) → `app.html`, `panel.html`, `superadmin.html`, tüm API
-→ hedef alan adı: `sevkio.online` (satın alınca bağlanacak, şimdilik `sevkio.vercel.app`)
-* **Ayrı proje** (`sevkio-marketing` reposu, ayrı zip'te) → sadece tanıtım sayfası
-→ hedef alan adı: `sevkio.com` (satın alınca bağlanacak)
+- **Bu proje** (`sevkio` reposu) → `app.html`, `panel.html`, `superadmin.html`, tüm API
+  → hedef alan adı: `sevkio.online` (satın alınca bağlanacak, şimdilik `sevkio.vercel.app`)
+- **Ayrı proje** (`sevkio-marketing` reposu, ayrı zip'te) → sadece tanıtım sayfası
+  → hedef alan adı: `sevkio.com` (satın alınca bağlanacak)
 
 Bu projede kök adrese (`/`) gelen istek otomatik olarak `/app.html`'e yönlendirilir — çünkü
 pazarlama sitesi artık burada değil, kök adresin bir işi kalmadı.
@@ -29,12 +28,12 @@ kendi README'sinde var.
 
 Artık sistem 4 ayrı alandan oluşuyor, her biri farklı bir kişi için:
 
-|Adres|Kim kullanır|Ne yapar|
-|-|-|-|
-|`/`|Herkes (halka açık)|Pazarlama sitesi — ürünü tanıtır, "Demo iste" formuyla talep toplar|
-|`/superadmin.html`|Sadece sen (platform sahibi)|Yeni firma/müşteri ekler, firmaları dondurur/aktif eder, gelen talepleri görür|
-|`/panel.html`|Firma yöneticisi (müşterin)|Pazaryeri bağlantıları + kendi çalışanlarını ekler/siler|
-|`/app.html`|Depo çalışanı|Barkod okutur, kargoya verir (PWA, telefona eklenebilir)|
+| Adres | Kim kullanır | Ne yapar |
+|---|---|---|
+| `/` | Herkes (halka açık) | Pazarlama sitesi — ürünü tanıtır, "Demo iste" formuyla talep toplar |
+| `/superadmin.html` | Sadece sen (platform sahibi) | Yeni firma/müşteri ekler, firmaları dondurur/aktif eder, gelen talepleri görür |
+| `/panel.html` | Firma yöneticisi (müşterin) | Pazaryeri bağlantıları + kendi çalışanlarını ekler/siler |
+| `/app.html` | Depo çalışanı | Barkod okutur, kargoya verir (PWA, telefona eklenebilir) |
 
 **Firma izolasyonu (çok önemli):** Her kullanıcının giriş yaptığında aldığı kimlik kartı (JWT token)
 içine hangi firmaya ait olduğu damgalanır. Sunucudaki her sorgu bu damgayı kontrol eder — A
@@ -48,9 +47,8 @@ bağlantılarını göremez/değiştiremez, yeni çalışan ekleyemez — bunlar
 ## Süper Admin hesabını ilk kez oluşturma
 
 Vercel'de **Environment Variables** kısmına şunları ekle:
-
-* `SUPERADMIN\_EMAIL` → kendi e-postan
-* `SUPERADMIN\_PASSWORD` → güçlü bir şifre
+- `SUPERADMIN_EMAIL` → kendi e-postan
+- `SUPERADMIN_PASSWORD` → güçlü bir şifre
 
 Deploy ettiğinde (ya da yeniden deploy ettiğinde) sunucu ilk açılışında bu bilgilerle otomatik
 bir süper admin hesabı oluşturur. Sonra `/superadmin.html` adresinden bu bilgilerle giriş yapıp
@@ -60,47 +58,40 @@ kendi pazaryeri bağlantılarını ve çalışanlarını ekliyor.
 
 ## Vercel + GitHub + Supabase ile yükleme — adım adım
 
-### 1\) Bu kodu GitHub'a koy
+### 1) Bu kodu GitHub'a koy
+- github.com'da ücretsiz hesap aç (yoksa)
+- Yeni bir repo oluştur (örnek: `kargo-sistemi`)
+- Bu klasördeki dosyaları repoya yükle (GitHub web arayüzünde "Add file → Upload files" ile
+  sürükle-bırak yapabilirsin — `node_modules` klasörünü YÜKLEME, zaten pakette yok)
 
-* github.com'da ücretsiz hesap aç (yoksa)
-* Yeni bir repo oluştur (örnek: `kargo-sistemi`)
-* Bu klasördeki dosyaları repoya yükle (GitHub web arayüzünde "Add file → Upload files" ile
-sürükle-bırak yapabilirsin — `node\_modules` klasörünü YÜKLEME, zaten pakette yok)
+### 2) Supabase'de veritabanı oluştur
+- supabase.com → "Start your project" → GitHub hesabınla giriş yap
+- "New project" → bir isim ver (örnek: `kargo-sistemi`), bir veritabanı şifresi belirle (not al, lazım olacak), bölge olarak Avrupa'ya yakın bir tane seç (örnek: Frankfurt)
+- Proje oluşunca sol menüden **Project Settings → Database** git
+- "Connection string" bölümünde **"Connection pooling"** sekmesine geç (bu önemli — Vercel'in sunucusuz yapısı için normal bağlantı değil, pooler bağlantısı gerekiyor), **URI** formatını kopyala.
+  Şuna benzer bir şey olacak:
+  `postgresql://postgres.xxxxx:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`
+- `[YOUR-PASSWORD]` yazan yere biraz önce belirlediğin şifreyi yaz
 
-### 2\) Supabase'de veritabanı oluştur
+### 3) Vercel'de projeyi bağla
+- vercel.com → GitHub hesabınla giriş yap
+- "Add New... → Project" → GitHub reposunu seç → "Import"
+- Deploy etmeden önce "Environment Variables" kısmına şunları ekle:
+  - `DATABASE_URL` → 2. adımda kopyaladığın Supabase bağlantı adresi
+  - `JWT_SECRET` → uzun rastgele bir metin (örnek: `openssl rand -hex 32` çıktısı)
+- "Deploy" de
 
-* supabase.com → "Start your project" → GitHub hesabınla giriş yap
-* "New project" → bir isim ver (örnek: `kargo-sistemi`), bir veritabanı şifresi belirle (not al, lazım olacak), bölge olarak Avrupa'ya yakın bir tane seç (örnek: Frankfurt)
-* Proje oluşunca sol menüden **Project Settings → Database** git
-* "Connection string" bölümünde **"Connection pooling"** sekmesine geç (bu önemli — Vercel'in sunucusuz yapısı için normal bağlantı değil, pooler bağlantısı gerekiyor), **URI** formatını kopyala.
-Şuna benzer bir şey olacak:
-`postgresql://postgres.xxxxx:\[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`
-* `\[YOUR-PASSWORD]` yazan yere biraz önce belirlediğin şifreyi yaz
-
-### 3\) Vercel'de projeyi bağla
-
-* vercel.com → GitHub hesabınla giriş yap
-* "Add New... → Project" → GitHub reposunu seç → "Import"
-* Deploy etmeden önce "Environment Variables" kısmına şunları ekle:
-
-  * `DATABASE\_URL` → 2. adımda kopyaladığın Supabase bağlantı adresi
-  * `JWT\_SECRET` → uzun rastgele bir metin (örnek: `openssl rand -hex 32` çıktısı)
-* "Deploy" de
-
-### 4\) Demo veriyi Supabase'e yükle
-
+### 4) Demo veriyi Supabase'e yükle
 Bilgisayarında (bir kere yapılacak):
-
 ```bash
 cd kargo-sistemi
 npm install
 cp .env.example .env
-# .env dosyasını aç, DATABASE\_URL satırını Supabase'den aldığın adresle değiştir, JWT\_SECRET'ı da gir
+# .env dosyasını aç, DATABASE_URL satırını Supabase'den aldığın adresle değiştir, JWT_SECRET'ı da gir
 npm run seed
 ```
 
-### 5\) Test et
-
+### 5) Test et
 Vercel sana verdiği `https://senin-proje-adin.vercel.app` adresini telefonundan aç.
 Giriş: `depo@demo.com` / `123456`
 Örnek barkodlar: `1288451236547`, `1288451236554`, `1288451236561`
@@ -113,46 +104,39 @@ Artık mock değil, **gerçek Trendyol Marketplace API'sine** bağlanan kod var.
 Trendyol Satıcı Paneli'nden ("Hesap Bilgilerim → Entegrasyon Bilgileri", partner.trendyol.com)
 şu 3 bilgiyi alması gerekiyor: **Satıcı ID (sellerId)**, **API Key**, **API Secret**.
 
-### 1\) Bağlantı bilgilerini sisteme kaydet
-
+### 1) Bağlantı bilgilerini sisteme kaydet
 ```bash
-curl -X POST https://senin-proje-adin.vercel.app/api/marketplace-connections \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer BURAYA\_GIRIS\_TOKENIN" \\
+curl -X POST https://senin-proje-adin.vercel.app/api/marketplace-connections \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer BURAYA_GIRIS_TOKENIN" \
   -d '{
     "marketplace": "trendyol",
-    "sellerId": "ARKADAŞININ\_SATICI\_ID",
-    "apiKey": "ARKADAŞININ\_API\_KEY",
-    "apiSecret": "ARKADAŞININ\_API\_SECRET",
+    "sellerId": "ARKADAŞININ_SATICI_ID",
+    "apiKey": "ARKADAŞININ_API_KEY",
+    "apiSecret": "ARKADAŞININ_API_SECRET",
     "environment": "prod"
   }'
 ```
-
 (Token'ı `/api/login` isteğinin cevabından alırsın — Postman kullanmak işini kolaylaştırır.)
 
-### 2\) Gerçek siparişleri çek
-
+### 2) Gerçek siparişleri çek
 ```bash
-curl -X POST https://senin-proje-adin.vercel.app/api/sync/trendyol \\
-  -H "Authorization: Bearer BURAYA\_GIRIS\_TOKENIN"
+curl -X POST https://senin-proje-adin.vercel.app/api/sync/trendyol \
+  -H "Authorization: Bearer BURAYA_GIRIS_TOKENIN"
 ```
-
 Bu istek, son 14 gündeki gerçek Trendyol siparişlerini çekip veritabanına yazar. Sipariş
 kalemlerindeki ürün barkodu sistemde kayıtlı değilse otomatik olarak (stok=0 ile) oluşturulur
 — gerçek stok miktarını sonradan elle düzeltmen gerekir (henüz ürün yönetim paneli yok).
 
-### 3\) Test et
-
+### 3) Test et
 PWA'dan (telefondan) gerçek bir Trendyol siparişinin kargo takip numarasını (barkod olarak
 kargo etiketinde basılı olan numara) okut. Sipariş bilgisi gerçek Trendyol verisiyle gelecek.
 "Kargoya Ver" dediğinde:
-
-* Trendyol'daki paket **"Picking" (hazırlanıyor)** statüsüne geçer (gerçek API çağrısı)
-* Stok gerçek `updatePriceAndInventory` servisiyle Trendyol'a bildirilir
+- Trendyol'daki paket **"Picking" (hazırlanıyor)** statüsüne geçer (gerçek API çağrısı)
+- Stok gerçek `updatePriceAndInventory` servisiyle Trendyol'a bildirilir
 
 **Not:** "Invoiced" (faturalandı) statüsüne geçiş için fatura numarası gerekiyor — bu henüz
 sisteme bağlı değil, sıradaki adımlardan biri.
-
 
 
 ```bash
@@ -163,7 +147,6 @@ npm start               # http://localhost:3000
 ```
 
 ## Mimari
-
 ```
 api/index.js   -> tüm backend (Vercel sunucusuz fonksiyonu olarak çalışır)
 lib/db.js      -> Postgres bağlantısı + tablo şeması
@@ -172,42 +155,50 @@ public/        -> PWA (barkod okuma ekranı), statik olarak servis edilir
 vercel.json    -> Vercel yönlendirme ayarı
 ```
 
-Veritabanı tasarımı çoklu firma (multi-tenant) — her satırda `company\_id` var,
+Veritabanı tasarımı çoklu firma (multi-tenant) — her satırda `company_id` var,
 yani birden fazla müşteri firma aynı sistemi kullanabilir, verileri hiç karışmaz.
 
 ## Otomatik Sipariş Çekme (Vercel Cron)
 
-Artık "Siparişleri Çek" butonuna basmak zorunda değilsin — sistem 6 saatte bir otomatik
-kontrol ediyor. Bunun çalışması için Vercel'de bir ortam değişkeni daha eklemen gerekiyor:
+Artık "Siparişleri Çek" butonuna basmak zorunda değilsin — sistem günde 1 kez otomatik
+kontrol ediyor (Vercel'in ücretsiz planı cron'ları günde 1 keple sınırlıyor, o yüzden bu
+şekilde ayarladım). Bunun çalışması için Vercel'de bir ortam değişkeni daha eklemen gerekiyor:
 
-* `CRON\_SECRET` → rastgele, uzun bir metin (örnek: `openssl rand -hex 32` çıktısı)
+- `CRON_SECRET` → rastgele, uzun bir metin (örnek: `openssl rand -hex 32` çıktısı)
 
 Bunu eklemezsen cron endpoint'i çalışmaz (güvenlik için kasıtlı olarak reddeder).
 Vercel, bu değişkeni otomatik olarak cron isteklerine ekliyor, sen sadece değeri girmen yeterli.
 
-**Not:** Vercel'in ücretsiz (Hobby) planında cron sıklığı konusunda kısıtlamalar olabilir
-(plan detayları değişebiliyor) — eğer 6 saatte bir çalışmıyorsa Vercel hesabındaki
-"Cron Jobs" sekmesinden veya güncel fiyatlandırma sayfasından kontrol et.
+**Not:** Vercel'in ücretsiz (Hobby) planı cron job'ları günde en fazla 1 kez çalışacak
+şekilde sınırlıyor — bu yüzden 6 saatte bir yerine günde 1 kez (gece 03:00) olarak ayarladım.
+Daha sık çalışmasını istersen Vercel'i Pro plana yükseltmen gerekir.
+
+## Vercel Otomatik Deploy Çalışmıyorsa (Deploy Hook)
+
+Eğer GitHub'a push attığında Vercel otomatik deploy etmiyorsa (webhook sorunu), manuel bir
+tetikleyici kullanabilirsin:
+- Vercel → proje → Settings → Git → en alttaki **"Deploy Hooks"** kutusu
+- Bir isim (örnek: `manuel-deploy`) ve branch (`main`) girip **"Create Hook"** de
+- Sana verdiği URL'i bir yere kaydet (not defteri, tarayıcı favorisi)
+- Deploy tetiklemek istediğinde o URL'i tarayıcıda açman (ya da `curl -X POST <url>` çalıştırman) yeterli
 
 ## Şifremi Unuttum
 
 Henüz e-posta gönderme altyapısı olmadığı için "şifremi unuttum, linke tıkla" akışı yok.
 Onun yerine:
-
-* Bir çalışan şifresini unutursa → firma yöneticisi `/panel.html` → Çalışanlar → "Şifre Sıfırla"
-* Firma yöneticisi şifresini unutursa (ve sıfırlayacak başka yönetici yoksa) → sen (süper admin)
-`/superadmin.html` → "Kullanıcı Şifresi Sıfırla" bölümünden e-postasını girip sıfırlarsın
+- Bir çalışan şifresini unutursa → firma yöneticisi `/panel.html` → Çalışanlar → "Şifre Sıfırla"
+- Firma yöneticisi şifresini unutursa (ve sıfırlayacak başka yönetici yoksa) → sen (süper admin)
+  `/superadmin.html` → "Kullanıcı Şifresi Sıfırla" bölümünden e-postasını girip sıfırlarsın
 
 ## Yönetici Paneli
 
 `https://senin-proje-adin.vercel.app/admin.html` adresinden pazaryeri bağlantılarını
 görsel arayüzden yönetebilirsin:
-
-* Her pazaryeri için Satıcı ID / API Key / API Secret gir, "Kaydet"
-* Aktif/Pasif anahtarıyla bir pazaryerini geçici olarak devre dışı bırak (kapattığında
-o pazaryerine stok gönderilmez, sipariş çekilmez)
-* "Siparişleri Çek" butonuyla o pazaryerinden manuel senkronizasyon tetikle
-* Hepsiburada, ÇiçekSepeti, Amazon şu an "yakında" olarak görünüyor — henüz gerçek API'leri bağlı değil
+- Her pazaryeri için Satıcı ID / API Key / API Secret gir, "Kaydet"
+- Aktif/Pasif anahtarıyla bir pazaryerini geçici olarak devre dışı bırak (kapattığında
+  o pazaryerine stok gönderilmez, sipariş çekilmez)
+- "Siparişleri Çek" butonuyla o pazaryerinden manuel senkronizasyon tetikle
+- Hepsiburada, ÇiçekSepeti, Amazon şu an "yakında" olarak görünüyor — henüz gerçek API'leri bağlı değil
 
 Aynı giriş bilgilerini kullanır (depo@demo.com / 123456 demo için).
 
@@ -219,26 +210,22 @@ Artık **Trendyol ve N11** gerçek API'lerine bağlanıyor. Her ikisi de aynı m
 2. "Siparişleri Çek" butonuna bas (ya da `POST /api/sync/trendyol` / `POST /api/sync/n11`)
 3. Gerçek siparişler veritabanına yazılır — kargo barkodunu PWA'dan okutup test edebilirsin
 4. "Kargoya Ver" dediğinde:
-
-   * **Trendyol**: paket gerçekten "Picking" statüsüne geçer, stok `updatePriceAndInventory` ile gönderilir
-   * **N11**: sipariş satırları gerçekten "Picking" (onaylandı) statüsüne geçer, stok `price-stock-update` ile gönderilir (N11 barkod değil **stockCode/SKU** ile eşleştirir — ürünlerinin SKU'sunun N11'deki stok koduyla aynı olması gerekiyor)
+   - **Trendyol**: paket gerçekten "Picking" statüsüne geçer, stok `updatePriceAndInventory` ile gönderilir
+   - **N11**: sipariş satırları gerçekten "Picking" (onaylandı) statüsüne geçer, stok `price-stock-update` ile gönderilir (N11 barkod değil **stockCode/SKU** ile eşleştirir — ürünlerinin SKU'sunun N11'deki stok koduyla aynı olması gerekiyor)
 
 **API bilgilerini nereden alırsın:**
-
-* Trendyol: partner.trendyol.com → Hesabım → Entegrasyon Bilgileri
-* N11: so.n11.com → Hesabım → API Hesapları
+- Trendyol: partner.trendyol.com → Hesabım → Entegrasyon Bilgileri
+- N11: so.n11.com → Hesabım → API Hesapları
 
 ## Henüz mock (sahte) olan / sıradaki adımlar
-
-* ~~Trendyol gerçek entegrasyonu~~ ✅
-* ~~N11 gerçek entegrasyonu~~ ✅
-* ~~Yönetici paneli (bağlantı ekleme/kapatma)~~ ✅
-* **Hepsiburada** — API'si belirgin şekilde daha karmaşık (ayrı paketleme adımları, kendi kargo
-sistemi "HepsiJet", fiyat kilitleme mekanizmaları). Ayrı bir tur gerektiriyor.
-* **ÇiçekSepeti** — henüz araştırılmadı/entegre edilmedi
-* **Amazon** — kapsam dışı bırakıldı (SP-API çok daha karmaşık, OAuth + onay süreci gerekiyor)
-* Kargo firması barkod/etiket API'si
-* Ürün ekleme/fiyat güncelleme ekranı (şu an sadece pazaryerinden otomatik senkronla geliyor)
-* Ödeme/abonelik akışı (iyzico/Stripe)
-* KVKK / kullanım şartları / gizlilik politikası metinleri..
-
+- ~~Trendyol gerçek entegrasyonu~~ ✅
+- ~~N11 gerçek entegrasyonu~~ ✅
+- ~~Yönetici paneli (bağlantı ekleme/kapatma)~~ ✅
+- **Hepsiburada** — API'si belirgin şekilde daha karmaşık (ayrı paketleme adımları, kendi kargo
+  sistemi "HepsiJet", fiyat kilitleme mekanizmaları). Ayrı bir tur gerektiriyor.
+- **ÇiçekSepeti** — henüz araştırılmadı/entegre edilmedi
+- **Amazon** — kapsam dışı bırakıldı (SP-API çok daha karmaşık, OAuth + onay süreci gerekiyor)
+- Kargo firması barkod/etiket API'si
+- Ürün ekleme/fiyat güncelleme ekranı (şu an sadece pazaryerinden otomatik senkronla geliyor)
+- Ödeme/abonelik akışı (iyzico/Stripe)
+- KVKK / kullanım şartları / gizlilik politikası metinleri
