@@ -205,7 +205,10 @@ app.post('/api/orders/:id/ship', authMiddleware, async (req, res) => {
       );
       updatedStocks.push({ productId: product.id, newStock });
     }
-    await client.query(`UPDATE orders SET status = 'kargoda', billed = 1 WHERE id = $1`, [order.id]);
+    await client.query(
+      `UPDATE orders SET status = 'kargoda', billed = 1, shipped_by = $1, shipped_at = now() WHERE id = $2`,
+      [req.userId, order.id]
+    );
 
     const period = new Date().toISOString().slice(0, 7);
     await client.query(`
@@ -655,18 +658,37 @@ app.patch('/api/returns/:id/reject', authMiddleware, requireRole('yonetici'), as
 
 app.get('/api/orders', authMiddleware, requireRole('yonetici'), async (req, res) => {
   const { status, marketplace, limit } = req.query;
-  const conditions = ['company_id = $1'];
+  const conditions = ['o.company_id = $1'];
   const params = [req.companyId];
-  if (status) { params.push(status); conditions.push(`status = $${params.length}`); }
-  if (marketplace) { params.push(marketplace); conditions.push(`marketplace = $${params.length}`); }
+  if (status) { params.push(status); conditions.push(`o.status = $${params.length}`); }
+  if (marketplace) { params.push(marketplace); conditions.push(`o.marketplace = $${params.length}`); }
   params.push(Math.min(parseInt(limit, 10) || 100, 300));
 
   const { rows } = await query(`
-    SELECT o.*, COALESCE(SUM(oi.quantity), 0) AS item_count
-    FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id
+    SELECT o.*, COALESCE(SUM(oi.quantity), 0) AS item_count, u.name AS shipped_by_name
+    FROM orders o
+    LEFT JOIN order_items oi ON oi.order_id = o.id
+    LEFT JOIN users u ON u.id = o.shipped_by
     WHERE ${conditions.join(' AND ')}
-    GROUP BY o.id ORDER BY o.created_at DESC LIMIT $${params.length}
+    GROUP BY o.id, u.name ORDER BY o.created_at DESC LIMIT $${params.length}
   `, params);
+  res.json(rows);
+});
+
+// ---------- Çalışan Performansı ----------
+
+app.get('/api/reports/performance', authMiddleware, requireRole('yonetici'), async (req, res) => {
+  const { days } = req.query;
+  const sinceDays = Math.min(parseInt(days, 10) || 30, 365);
+  const { rows } = await query(`
+    SELECT u.id, u.name, u.role,
+      COUNT(o.id) FILTER (WHERE o.shipped_at >= now() - ($1 || ' days')::interval) AS shipped_count,
+      MAX(o.shipped_at) AS last_shipped_at
+    FROM users u
+    LEFT JOIN orders o ON o.shipped_by = u.id AND o.company_id = u.company_id
+    WHERE u.company_id = $2
+    GROUP BY u.id ORDER BY shipped_count DESC
+  `, [String(sinceDays), req.companyId]);
   res.json(rows);
 });
 
